@@ -7,7 +7,7 @@ export default function Reports(){
   const [stats,setStats]=useState<Stats|null>(null);
   const [loading,setLoading]=useState(true);
   useEffect(()=>{ fetch("/api/admin/stats").then(r=>r.ok?r.json():null).then(setStats).finally(()=>setLoading(false)); },[]);
-  const download=(extra="")=>{ window.location.href="/api/admin/reports/bookings"+extra; };
+  const download=(extra="")=>{ window.location.href="/api/admin/reports/bookings/xlsx"+extra; };
   const money=(n:number)=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",maximumFractionDigits:0}).format(n);
   return <main className="pt-32 pb-20"><div className="container">
     <span className="eyebrow">Analytics</span><h1 className="text-5xl font-black mt-3">Reports.</h1>
@@ -19,7 +19,7 @@ export default function Reports(){
       ].map(([label,value])=><div className="card p-5" key={String(label)}><p className="muted text-sm">{label}</p><p className="text-2xl font-black mt-2">{loading?"…":value}</p></div>)}
     </div>
     <div className="grid md:grid-cols-3 gap-4 mt-10">
-      <div className="card p-6"><h2 className="font-black text-xl">Bookings</h2><p className="muted mt-2 text-sm">All reservation records with customer, club, package, payment and transport details.</p><button onClick={()=>download()} className="btn-primary text-sm mt-6">Download Excel-compatible CSV</button></div>
+      <div className="card p-6"><h2 className="font-black text-xl">Bookings</h2><p className="muted mt-2 text-sm">All reservation records with customer, club, package, payment and transport details.</p><button onClick={()=>download()} className="btn-primary text-sm mt-6">Download Excel (.xlsx)</button></div>
       <div className="card p-6"><h2 className="font-black text-xl">Payments</h2><p className="muted mt-2 text-sm">Booking value and payment status are included in the booking export.</p><button onClick={()=>download("?paymentStatus=PAID")} className="btn-secondary text-sm mt-6">Export paid bookings</button></div>
       <div className="card p-6"><h2 className="font-black text-xl">Transport</h2><p className="muted mt-2 text-sm">Pickup location, transport type and booking payment status are included for operations.</p><button onClick={()=>download("?transportType=CAB")} className="btn-secondary text-sm mt-6">Export cab bookings</button></div>
     </div>
