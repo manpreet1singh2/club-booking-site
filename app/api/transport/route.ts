@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { notifyTransportAssigned } from "@/lib/notifications";
 
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
@@ -73,6 +74,7 @@ export async function POST(req: NextRequest) {
       include: { driver: { include: { user: { select: { id: true, name: true, phone: true } } } } },
     });
 
+    notifyTransportAssigned(transport.id).catch(() => undefined);
     return NextResponse.json(transport, { status: 201 });
   } catch {
     return NextResponse.json({ error: "Unable to assign transport" }, { status: 400 });
