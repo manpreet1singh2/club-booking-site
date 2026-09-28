@@ -14,7 +14,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     where: { id },
     include: {
       user: { select: { id: true, name: true, email: true, phone: true, role: true } },
-      club: true,
+      club: { include: { owner: { select: { id: true } } } },
       event: true,
       package: true,
       payments: true,
@@ -26,6 +26,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
 
   const privileged = user.role === "SUPER_ADMIN" || user.role === "CLUB_OWNER";
   const driverOwnRide = user.role === "DRIVER" && booking.transport?.driver?.user.id === user.id;
+  if (user.role === "CLUB_OWNER" && booking.club.ownerId !== user.id) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   if (booking.userId !== user.id && !privileged && !driverOwnRide) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
