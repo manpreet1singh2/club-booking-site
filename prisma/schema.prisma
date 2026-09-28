@@ -5,7 +5,7 @@ enum BookingStatus { PENDING_PAYMENT CONFIRMED CANCELLED COMPLETED EXPIRED REFUN
 enum PaymentStatus { PENDING PAID FAILED REFUNDED PARTIAL }
 enum TransportType { NONE CAB BIKE }
 enum TransportStatus { PENDING ASSIGNED DRIVER_CONFIRMED ON_THE_WAY ARRIVED PICKED_UP COMPLETED CANCELLED }
-model User { id String @id @default(cuid()) name String email String @unique phone String? passwordHash String role Role @default(CUSTOMER) bookings Booking[] driver Driver? createdAt DateTime @default(now()) updatedAt DateTime @updatedAt }
+model User { id String @id @default(cuid()) name String email String @unique phone String? passwordHash String role Role @default(CUSTOMER) bookings Booking[] driver Driver? sessions Session[] createdAt DateTime @default(now()) updatedAt DateTime @updatedAt }
 model Club { id String @id @default(cuid()) name String slug String @unique city String address String description String? imageUrl String? active Boolean @default(true) events Event[] packages Package[] bookings Booking[] createdAt DateTime @default(now()) updatedAt DateTime @updatedAt }
 model Event { id String @id @default(cuid()) clubId String club Club @relation(fields:[clubId],references:[id]) name String slug String date DateTime startTime String endTime String? capacity Int? active Boolean @default(true) bookings Booking[] createdAt DateTime @default(now()) }
 model Package { id String @id @default(cuid()) clubId String club Club @relation(fields:[clubId],references:[id]) name String description String? price Decimal @db.Decimal(10,2) active Boolean @default(true) bookings Booking[] createdAt DateTime @default(now()) }
@@ -16,3 +16,4 @@ model TransportBooking { id String @id @default(cuid()) bookingId String @unique
 model PromoCode { id String @id @default(cuid()) code String @unique type String value Decimal @db.Decimal(10,2) active Boolean @default(true) expiresAt DateTime? }
 model NotificationLog { id String @id @default(cuid()) userId String? channel String template String status String providerMessageId String? createdAt DateTime @default(now()) }
 model AuditLog { id String @id @default(cuid()) userId String? action String entity String entityId String? metadata Json? createdAt DateTime @default(now()) }
+\nmodel Session { id String @id @default(cuid()) tokenHash String @unique userId String user User @relation(fields:[userId],references:[id],onDelete:Cascade) expiresAt DateTime createdAt DateTime @default(now()) }\n
