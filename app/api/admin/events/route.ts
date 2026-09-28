@@ -1,0 +1,5 @@
+import {NextResponse} from "next/server"; import {getCurrentUser} from "@/lib/auth"; import {prisma} from "@/lib/prisma"; import {z} from "zod";
+const schema=z.object({clubId:z.string().min(1),name:z.string().min(2),slug:z.string().min(2),date:z.coerce.date(),startTime:z.string().min(1),endTime:z.string().optional(),capacity:z.coerce.number().int().positive().optional(),active:z.boolean().optional()});
+async function guard(){const u=await getCurrentUser();return u?.role==="SUPER_ADMIN"?u:null}
+export async function GET(){if(!await guard())return NextResponse.json({error:"FORBIDDEN"},{status:403});return NextResponse.json(await prisma.event.findMany({include:{club:{select:{name:true}},_count:{select:{bookings:true}}},orderBy:{date:"asc"}}))}
+export async function POST(req:Request){if(!await guard())return NextResponse.json({error:"FORBIDDEN"},{status:403});const p=schema.safeParse(await req.json());if(!p.success)return NextResponse.json({error:p.error.flatten()},{status:400});return NextResponse.json(await prisma.event.create({data:p.data}),{status:201})}
