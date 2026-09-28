@@ -1,5 +1,7 @@
-import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-export async function PATCH(req:Request,{params}:{params:Promise<{id:string}>}){const u=await getCurrentUser();if(u?.role!=="SUPER_ADMIN")return NextResponse.json({error:"FORBIDDEN"},{status:403});const id=(await params).id,body=await req.json();return NextResponse.json(await prisma.package.update({where:{id},data:{clubId:body.clubId,name:body.name,description:body.description,price:Number(body.price),pricing:body.pricing==="FLAT"?"FLAT":"PER_PERSON",active:Boolean(body.active)}}))}
+import {NextResponse} from "next/server";
+import {getCurrentUser} from "@/lib/auth";
+import {prisma} from "@/lib/prisma";
+import {z} from "zod";
+const schema=z.object({clubId:z.string().min(1).optional(),name:z.string().trim().min(2).max(120).optional(),description:z.string().max(500).optional(),price:z.coerce.number().positive().max(10000000).optional(),pricing:z.enum(["PER_PERSON","FLAT"]).optional(),active:z.boolean().optional()});
+export async function PATCH(req:Request,{params}:{params:Promise<{id:string}>}){const u=await getCurrentUser();if(u?.role!=="SUPER_ADMIN")return NextResponse.json({error:"FORBIDDEN"},{status:403});try{const id=(await params).id;const body=schema.parse(await req.json());const existing=await prisma.package.findUnique({where:{id},include:{_count:{select:{bookings:true}}});if(!existing)return NextResponse.json({error:"Package not found"},{status:404});const updated=await prisma.package.update({where:{id},data:body});return NextResponse.json(updated)}catch(e){return NextResponse.json({error:e instanceof Error?e.message:"Invalid package update"},{status:400})}}
 export async function DELETE(req:Request,{params}:{params:Promise<{id:string}>}){const u=await getCurrentUser();if(u?.role!=="SUPER_ADMIN")return NextResponse.json({error:"FORBIDDEN"},{status:403});return NextResponse.json(await prisma.package.update({where:{id:(await params).id},data:{active:false}}))}
