@@ -52,15 +52,26 @@ export async function POST(req: NextRequest) {
     if (!pkg || !pkg.active) return NextResponse.json({ error: "Package unavailable" }, { status: 400 });
 
     const club = await prisma.club.findUnique({ where: { id: body.clubId } });
-    if (!club || !club.active) return NextResponse.json({ error: "Club unavailable" }, { status: 400 });
-
-    const amounts = calculateBookingAmounts(Number(pkg.price));
+    if (!club || !club.active || pkg.clubId !== club.id) return NextResponse.json({ error: "Club unavailable" }, { status: 400 });
+    if (body.visitDate.getTime() < Date.now() - 60_000) return NextResponse.json({ error: "Visit date must be in the future" }, { status: 400 });
+    let event = null;
+    if (body.eventId) {
+      event = await prisma.event.findFirst({ where: { id: body.eventId, clubId: club.id, active: true } });
+      if (!event || event.date.toDateString() !== body.visitDate.toDateString()) return NextResponse.json({ error: "Selected event is not available on this date" }, { status: 400 });
+      if (event.capacity) {
+        const reserved = await prisma.booking.aggregate({ where: { eventId: event.id, status: { in: ["PENDING_PAYMENT","CONFIRMED"] } }, _sum: { guestCount: true } });
+        if ((reserved._sum.guestCount ?? 0) + body.guestCount > event.capacity) return NextResponse.json({ error: "Event capacity is full for this group size" }, { status: 409 });
+      }
+    }
+    if (body.transportType !== "NONE" && (!body.pickupLocation || !body.pickupTime)) return NextResponse.json({ error: "Pickup location and time are required for transport" }, { status: 400 });
+    const amounts = calculateBookingAmounts(Number(pkg.price), body.guestCount, pkg.pricing);
     const booking = await prisma.booking.create({
       data: {
         bookingCode: createBookingCode(),
         userId: user.id,
         clubId: body.clubId,
         eventId: body.eventId,
+        visitDate: body.visitDate,
         packageId: body.packageId,
         guestCount: body.guestCount,
         transportType: body.transportType,
