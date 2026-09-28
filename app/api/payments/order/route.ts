@@ -17,7 +17,9 @@ export async function POST(req: Request) {
     const existing = await prisma.payment.findFirst({ where: { bookingId: booking.id, status: "PENDING", gatewayOrderId: { not: null } } });
     if (existing?.gatewayOrderId) return NextResponse.json({ orderId: existing.gatewayOrderId, amount: Number(booking.advanceAmount), currency: "INR", keyId: process.env.PAYMENT_KEY_ID });
 
-    const order = await createRazorpayOrder(Number(booking.advanceAmount), booking.bookingCode);
+    const expectedAdvance = Number(booking.advanceAmount);
+    if (!Number.isFinite(expectedAdvance) || expectedAdvance <= 0) return NextResponse.json({ error: "Invalid payment amount" }, { status: 400 });
+    const order = await createRazorpayOrder(expectedAdvance, booking.bookingCode);
     await prisma.payment.create({
       data: { bookingId: booking.id, amount: booking.advanceAmount, status: "PENDING", gateway: "razorpay", gatewayOrderId: order.id },
     });
