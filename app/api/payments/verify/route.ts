@@ -21,6 +21,7 @@ export async function POST(req: Request) {
 
     if (payment.status === "PAID") return NextResponse.json({ ok: true, alreadyProcessed: true });
     if (!verifyRazorpaySignature(orderId, paymentId, signature)) return NextResponse.json({ error: "Invalid payment signature" }, { status: 400 });
+    if (Number(payment.amount) !== Number(payment.booking.advanceAmount)) return NextResponse.json({ error: "Payment amount does not match the expected advance" }, { status: 400 });
 
     const result = await prisma.$transaction(async tx => {
       const updatedPayment = await tx.payment.update({
