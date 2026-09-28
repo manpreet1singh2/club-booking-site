@@ -12,17 +12,24 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const requestedUserId = searchParams.get("userId");
   const clubId = searchParams.get("clubId");
+  const status = searchParams.get("status");
+  const paymentStatus = searchParams.get("paymentStatus");
+  const q = searchParams.get("q");
 
   const isPrivileged = user.role === "SUPER_ADMIN" || user.role === "CLUB_OWNER";
   if (requestedUserId && requestedUserId !== user.id && !isPrivileged) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const bookings = await prisma.booking.findMany({
-    where: {
-      ...(isPrivileged && requestedUserId ? { userId: requestedUserId } : !isPrivileged ? { userId: user.id } : {}),
-      ...(clubId ? { clubId } : {}),
-    },
+  const where: any = {
+    ...(isPrivileged && requestedUserId ? { userId: requestedUserId } : !isPrivileged ? { userId: user.id } : {}),
+    ...(clubId ? { clubId } : {}),
+    ...(status ? { status } : {}),
+    ...(paymentStatus ? { paymentStatus } : {}),
+    ...(q ? { OR: [{ bookingCode: { contains: q, mode: "insensitive" } }, { user: { name: { contains: q, mode: "insensitive" } } }, { user: { phone: { contains: q } } }] } : {}),
+  };
+  if (user.role === "CLUB_OWNER") where.club = { ownerId: user.id };
+  const bookings = await prisma.booking.findMany({ where,
     include: {
       club: true,
       event: true,
