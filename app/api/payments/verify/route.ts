@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { verifyRazorpaySignature } from "@/lib/razorpay";
+import { notifyBookingConfirmed } from "@/lib/notifications";
 
 export async function POST(req: Request) {
   const user = await getCurrentUser();
@@ -35,6 +36,7 @@ export async function POST(req: Request) {
       return { updatedPayment, updatedBooking };
     });
 
+    if (result.updatedBooking.status === "CONFIRMED") notifyBookingConfirmed(result.updatedBooking.id).catch(() => undefined);
     return NextResponse.json({ ok: true, booking: result.updatedBooking });
   } catch {
     return NextResponse.json({ error: "Payment verification failed" }, { status: 400 });
