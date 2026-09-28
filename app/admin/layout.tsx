@@ -1,0 +1,2 @@
+import {redirect} from "next/navigation"; import {getCurrentUser} from "@/lib/auth";
+export default async function AdminLayout({children}:{children:React.ReactNode}){const u=await getCurrentUser();if(!u)redirect("/login?next=/admin");if(u.role!=="SUPER_ADMIN"&&u.role!=="CLUB_OWNER")redirect("/");return <>{children}</>}
