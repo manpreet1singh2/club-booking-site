@@ -20,11 +20,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const body = await req.json();
   const next = String(body.status || "");
 
-  const ride = await prisma.transportBooking.findUnique({ where: { id }, include: { driver: true } });
+  const ride = await prisma.transportBooking.findUnique({ where: id ? { id } : { id }, include: { driver: true, booking: { include: { club: { select: { ownerId: true } } } } } });
   if (!ride) return NextResponse.json({ error: "Transport booking not found" }, { status: 404 });
 
   const privileged = user.role === "SUPER_ADMIN" || user.role === "CLUB_OWNER";
   const ownDriver = user.role === "DRIVER" && ride.driver?.userId === user.id;
+  if (user.role === "CLUB_OWNER" && ride.booking.club.ownerId !== user.id) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   if (!privileged && !ownDriver) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   if (!Object.prototype.hasOwnProperty.call(transitions, ride.status) || !transitions[ride.status].includes(next)) {
