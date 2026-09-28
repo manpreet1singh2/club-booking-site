@@ -24,10 +24,10 @@ export async function createRazorpayOrder(amount: number, receipt: string) {
 export function verifyRazorpaySignature(orderId: string, paymentId: string, signature: string) {
   const { keySecret } = requireRazorpayConfig();
   const expected = crypto.createHmac("sha256", keySecret).update(orderId + "|" + paymentId).digest("hex");
-  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+  const actual = Buffer.from(signature); const expectedBuffer = Buffer.from(expected); return actual.length === expectedBuffer.length && crypto.timingSafeEqual(expectedBuffer, actual);
 }
 
-export function verifyWebhookSignature(body: string, signature: string) {
+export async function createRazorpayRefund(paymentId: string, amount: number, receipt: string) {\n  const { keyId, keySecret } = requireRazorpayConfig();\n  const auth = Buffer.from(keyId + ":" + keySecret).toString("base64");\n  const response = await fetch("https://api.razorpay.com/v1/payments/" + encodeURIComponent(paymentId) + "/refund", { method: "POST", headers: { Authorization: "Basic " + auth, "Content-Type": "application/json" }, body: JSON.stringify({ amount: Math.round(amount * 100), receipt }), cache: "no-store" });\n  if (!response.ok) throw new Error("Unable to create payment refund");\n  return response.json() as Promise<{ id: string; amount: number; status: string; payment_id: string }>;\n}\n\nexport function verifyWebhookSignature(body: string, signature: string) {
   const secret = process.env.PAYMENT_WEBHOOK_SECRET;
   if (!secret) throw new Error("Payment webhook secret is not configured");
   const expected = crypto.createHmac("sha256", secret).update(body).digest("hex");
