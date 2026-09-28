@@ -45,7 +45,7 @@ export async function getCurrentUser() {
   return session.user;
 }
 
-export async function requireUser() {
+export async function revokeCurrentSession() { const jar = await cookies(); const token = jar.get(SESSION_COOKIE)?.value; if (token) await prisma.session.deleteMany({ where: { tokenHash: hashSessionToken(token) } }); }\n\nexport async function requireUser() {
   const user = await getCurrentUser();
   if (!user) throw new Error("UNAUTHORIZED");
   return user;
