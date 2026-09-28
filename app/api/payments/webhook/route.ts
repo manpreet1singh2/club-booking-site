@@ -10,6 +10,8 @@ export async function POST(req: Request) {
     if (!signature || !verifyWebhookSignature(raw, signature)) return NextResponse.json({ error: "Invalid webhook signature" }, { status: 400 });
     const payload = JSON.parse(raw);
     const event = String(payload.event || "");
+    const eventId = String(payload.id || "");
+    if (eventId && await prisma.payment.findFirst({ where: { webhookEventId: eventId } })) return NextResponse.json({ received: true, duplicate: true });
     const entity = payload.payload?.payment?.entity;
     if (!entity?.order_id || !entity?.id) return NextResponse.json({ received: true });
 
@@ -19,7 +21,7 @@ export async function POST(req: Request) {
     if (event === "payment.captured" || event === "order.paid") {
       let confirmed = false;
       await prisma.$transaction(async tx => {
-        await tx.payment.update({ where: { id: payment.id }, data: { status: "PAID", gatewayPaymentId: String(entity.id) } });
+        await tx.payment.update({ where: { id: payment.id }, data: { status: "PAID", gatewayPaymentId: String(entity.id), webhookEventId: eventId || null } });
         const aggregate = await tx.payment.aggregate({ where: { bookingId: payment.bookingId, status: "PAID" }, _sum: { amount: true } });
         const paid = Number(aggregate._sum.amount || 0);
         const booking = await tx.booking.findUnique({ where: { id: payment.bookingId } });
@@ -29,7 +31,7 @@ export async function POST(req: Request) {
       });
       if (confirmed) notifyBookingConfirmed(payment.bookingId).catch(() => undefined);
     } else if (event === "payment.failed") {
-      await prisma.payment.update({ where: { id: payment.id }, data: { status: "FAILED", gatewayPaymentId: String(entity.id) } });
+      await prisma.payment.update({ where: { id: payment.id }, data: { status: "FAILED", gatewayPaymentId: String(entity.id), webhookEventId: eventId || null } });
     }
     return NextResponse.json({ received: true });
   } catch {
