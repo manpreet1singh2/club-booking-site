@@ -20,7 +20,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const body = await req.json();
   const next = String(body.status || "");
 
-  const ride = await prisma.transportBooking.findUnique({ where: id ? { id } : { id }, include: { driver: true, booking: { include: { club: { select: { ownerId: true } } } } } });
+  const ride = await prisma.transportBooking.findUnique({ where: { id }, include: { driver: true, booking: { include: { club: { select: { ownerId: true } } } } } });
   if (!ride) return NextResponse.json({ error: "Transport booking not found" }, { status: 404 });
 
   const privileged = user.role === "SUPER_ADMIN" || user.role === "CLUB_OWNER";
