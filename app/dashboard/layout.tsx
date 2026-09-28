@@ -1,0 +1,2 @@
+import {redirect} from "next/navigation"; import {getCurrentUser} from "@/lib/auth";
+export default async function DashboardLayout({children}:{children:React.ReactNode}){const u=await getCurrentUser();if(!u)redirect("/login?next=/dashboard");if(u.role!=="CUSTOMER")redirect("/");return <>{children}</>}
