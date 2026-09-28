@@ -56,6 +56,7 @@ export async function POST(req: NextRequest) {
       if (body.visitDate.getTime() < Date.now() - 60_000) throw new Error("Visit date must be in the future");
 
       let event = null;
+      if (!body.eventId) throw new Error("An event selection is required");
       if (body.eventId) {
         event = await tx.event.findFirst({ where: { id: body.eventId, clubId: club.id, active: true } });
         if (!event || event.date.toDateString() !== body.visitDate.toDateString()) throw new Error("Selected event is not available on this date");
