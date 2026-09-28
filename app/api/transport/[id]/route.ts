@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { notifyTransportStatus } from "@/lib/notifications";
 
 const transitions: Record<string, string[]> = {
   ASSIGNED: ["DRIVER_CONFIRMED", "CANCELLED"],
@@ -40,5 +41,6 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return result;
   });
 
+  notifyTransportStatus(updated.id).catch(() => undefined);
   return NextResponse.json(updated);
 }
