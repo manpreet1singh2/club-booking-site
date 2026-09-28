@@ -1,0 +1,1 @@
+export default function Tickets(){return <main className="pt-32 pb-20"><div className="container"><span className="eyebrow">Customer portal</span><h1 className="text-5xl font-black mt-3">Digital tickets.</h1><div className="card p-8 mt-10"><p className="muted">Your verified tickets will appear here after payment confirmation.</p></div></div></main>
