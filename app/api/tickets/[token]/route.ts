@@ -6,7 +6,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
   const booking = await prisma.booking.findUnique({
     where: { ticketToken: token },
     select: {
-      bookingCode: true, status: true, paymentStatus: true, guestCount: true, transportType: true,
+      bookingCode: true, status: true, paymentStatus: true, guestCount: true, transportType: true, visitDate: true, pickupLocation: true,
       club: { select: { name: true, city: true, address: true } },
       event: { select: { name: true, date: true, startTime: true, endTime: true } },
       package: { select: { name: true } },
