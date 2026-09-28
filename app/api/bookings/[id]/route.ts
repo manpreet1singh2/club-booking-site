@@ -57,10 +57,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   if (user.role === "CUSTOMER" && booking.status === "COMPLETED") return NextResponse.json({ error: "Completed bookings cannot be cancelled" }, { status: 400 });
   if (body.status === "CONFIRMED" && booking.paymentStatus === "PENDING") return NextResponse.json({ error: "Payment must be verified before confirmation" }, { status: 400 });
-  if (body.status === "REFUNDED" && booking.paymentStatus !== "REFUND_PENDING") return NextResponse.json({ error: "Booking must be marked refund-pending first" }, { status: 400 });
+  if (body.status === "REFUND_PENDING" && booking.paymentStatus !== "PENDING") return NextResponse.json({ error: "Only unpaid bookings can enter refund-pending state" }, { status: 400 });
+  if (body.status === "REFUNDED" && booking.status !== "REFUND_PENDING") return NextResponse.json({ error: "Booking must be refund-pending first" }, { status: 400 });
   const updated = await prisma.$transaction(async tx => {
     const result = await tx.booking.update({ where: { id }, data: body.status ? { status: body.status as Status } : {} });
     if (body.status === "REFUND_PENDING") await tx.booking.update({ where: { id }, data: { paymentStatus: "REFUNDED" } });
+    if (body.status === "REFUNDED") await tx.booking.update({ where: { id }, data: { paymentStatus: "REFUNDED" } });
     return result;
   });
   return NextResponse.json(updated);
