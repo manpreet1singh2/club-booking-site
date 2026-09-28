@@ -1,6 +1,6 @@
 "use client";
 import {useEffect,useState} from "react";
-type P={id:string;name:string;description:string|null;price:string;active:boolean;club:{id:string;name:string};_count:{bookings:number}}; type C={id:string;name:string};
+type P={id:string;name:string;description:string|null;price:string;pricing:"PER_PERSON"|"FLAT";active:boolean;club:{id:string;name:string};_count:{bookings:number}}; type C={id:string;name:string};
 export default function PackagesAdmin(){
  const [rows,setRows]=useState<P[]>([]),[clubs,setClubs]=useState<C[]>([]),[form,setForm]=useState({clubId:"",name:"",description:"",price:"",pricing:"PER_PERSON"});
  const load=()=>fetch("/api/admin/packages").then(r=>r.ok?r.json():[]).then(setRows); useEffect(()=>{load();fetch("/api/admin/clubs").then(r=>r.ok?r.json():[]).then(setClubs)},[]);
