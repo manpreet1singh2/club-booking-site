@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/auth";
 
 export async function GET(_: Request, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
+  const viewer = await getCurrentUser();
   const booking = await prisma.booking.findUnique({
     where: { ticketToken: token },
     select: {
@@ -15,5 +17,5 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
   });
   if (!booking) return NextResponse.json({ valid: false, error: "Ticket not found" }, { status: 404 });
   const valid = booking.status === "CONFIRMED" && ["PAID","PARTIAL"].includes(booking.paymentStatus);
-  return NextResponse.json({ valid, ticket: booking });
+  return NextResponse.json({ valid, ticket: booking, viewerRole: viewer?.role || null });
 }
