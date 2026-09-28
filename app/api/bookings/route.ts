@@ -48,41 +48,35 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
 
     const body = bookingSchema.omit({ userId: true }).parse(await req.json());
-    const pkg = await prisma.package.findUnique({ where: { id: body.packageId } });
-    if (!pkg || !pkg.active) return NextResponse.json({ error: "Package unavailable" }, { status: 400 });
+    const booking = await prisma.$transaction(async tx => {
+      const pkg = await tx.package.findUnique({ where: { id: body.packageId } });
+      if (!pkg || !pkg.active) throw new Error("Package unavailable");
+      const club = await tx.club.findUnique({ where: { id: body.clubId } });
+      if (!club || !club.active || pkg.clubId !== club.id) throw new Error("Club unavailable");
+      if (body.visitDate.getTime() < Date.now() - 60_000) throw new Error("Visit date must be in the future");
 
-    const club = await prisma.club.findUnique({ where: { id: body.clubId } });
-    if (!club || !club.active || pkg.clubId !== club.id) return NextResponse.json({ error: "Club unavailable" }, { status: 400 });
-    if (body.visitDate.getTime() < Date.now() - 60_000) return NextResponse.json({ error: "Visit date must be in the future" }, { status: 400 });
-    let event = null;
-    if (body.eventId) {
-      event = await prisma.event.findFirst({ where: { id: body.eventId, clubId: club.id, active: true } });
-      if (!event || event.date.toDateString() !== body.visitDate.toDateString()) return NextResponse.json({ error: "Selected event is not available on this date" }, { status: 400 });
-      if (event.capacity) {
-        const reserved = await prisma.booking.aggregate({ where: { eventId: event.id, status: { in: ["PENDING_PAYMENT","CONFIRMED"] } }, _sum: { guestCount: true } });
-        if ((reserved._sum.guestCount ?? 0) + body.guestCount > event.capacity) return NextResponse.json({ error: "Event capacity is full for this group size" }, { status: 409 });
+      let event = null;
+      if (body.eventId) {
+        event = await tx.event.findFirst({ where: { id: body.eventId, clubId: club.id, active: true } });
+        if (!event || event.date.toDateString() !== body.visitDate.toDateString()) throw new Error("Selected event is not available on this date");
+        if (event.capacity) {
+          const reserved = await tx.booking.aggregate({ where: { eventId: event.id, status: { in: ["PENDING_PAYMENT","CONFIRMED"] } }, _sum: { guestCount: true } });
+          if ((reserved._sum.guestCount ?? 0) + body.guestCount > event.capacity) throw new Error("Event capacity is full for this group size");
+        }
       }
-    }
-    if (body.transportType !== "NONE" && (!body.pickupLocation || !body.pickupTime)) return NextResponse.json({ error: "Pickup location and time are required for transport" }, { status: 400 });
-    const amounts = calculateBookingAmounts(Number(pkg.price), body.guestCount, pkg.pricing);
-    const booking = await prisma.booking.create({
-      data: {
-        bookingCode: createBookingCode(),
-        userId: user.id,
-        clubId: body.clubId,
-        eventId: body.eventId,
-        visitDate: body.visitDate,
-        packageId: body.packageId,
-        guestCount: body.guestCount,
-        transportType: body.transportType,
-        pickupLocation: body.pickupLocation,
-        pickupTime: body.pickupTime,
-        totalAmount: amounts.totalAmount,
-        advanceAmount: amounts.advanceAmount,
-        remainingAmount: amounts.remainingAmount,
-      },
-      include: { club: true, package: true, event: true },
-    });
+      if (body.transportType !== "NONE" && (!body.pickupLocation || !body.pickupTime)) throw new Error("Pickup location and time are required for transport");
+      const amounts = calculateBookingAmounts(Number(pkg.price), body.guestCount, pkg.pricing);
+      return tx.booking.create({
+        data: {
+          bookingCode: createBookingCode(), userId: user.id, clubId: body.clubId, eventId: body.eventId,
+          visitDate: body.visitDate, packageId: body.packageId, guestCount: body.guestCount,
+          transportType: body.transportType, pickupLocation: body.pickupLocation, pickupTime: body.pickupTime,
+          totalAmount: amounts.totalAmount, advanceAmount: amounts.advanceAmount, remainingAmount: amounts.remainingAmount,
+        },
+        include: { club: true, package: true, event: true },
+      });
+    }, { isolationLevel: "Serializable", maxWait: 5000, timeout: 10000 });
+
     notifyBookingCreated(booking.id).catch(() => undefined);
     return NextResponse.json(booking, { status: 201 });
   } catch (error) {
