@@ -11,8 +11,10 @@ export async function GET(req: NextRequest) {
   const privileged = user.role === "SUPER_ADMIN" || user.role === "CLUB_OWNER";
 
   const transport = await prisma.transportBooking.findMany({
-    where: privileged
+    where: user.role === "SUPER_ADMIN"
       ? driverId ? { driverId } : {}
+      : user.role === "CLUB_OWNER"
+        ? { ...(driverId ? { driverId } : {}), booking: { club: { ownerId: user.id } } }
       : user.role === "DRIVER"
         ? { driver: { userId: user.id } }
         : { booking: { userId: user.id } },
@@ -36,7 +38,8 @@ export async function POST(req: NextRequest) {
     const driverId = body.driverId ? String(body.driverId) : null;
     if (!bookingId) return NextResponse.json({ error: "bookingId is required" }, { status: 400 });
 
-    const booking = await prisma.booking.findUnique({ where: { id: bookingId } });
+    const booking = await prisma.booking.findUnique({ where: { id: bookingId }, include: { club: { select: { ownerId: true } } } });
+    if (user.role === "CLUB_OWNER" && booking?.club.ownerId !== user.id) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     if (!booking || booking.transportType === "NONE" || !booking.pickupLocation || !booking.pickupTime) {
       return NextResponse.json({ error: "Booking has no valid transport request" }, { status: 400 });
     }
