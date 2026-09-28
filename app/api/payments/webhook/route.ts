@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyWebhookSignature } from "@/lib/razorpay";
+import { notifyBookingConfirmed } from "@/lib/notifications";
 
 export async function POST(req: Request) {
   const raw = await req.text();
@@ -13,7 +14,8 @@ export async function POST(req: Request) {
     const payload = JSON.parse(raw);
     const event = String(payload.event || "");
     const entity = payload.payload?.payment?.entity;
-    if (!entity?.order_id || !entity?.id) return NextResponse.json({ received: true });
+    if (!entity?.order_id || !entity?.id) if (booking && event === "payment.captured") notifyBookingConfirmed(booking.bookingId).catch(() => undefined);
+    return NextResponse.json({ received: true });
 
     const payment = await prisma.payment.findUnique({ where: { gatewayOrderId: String(entity.order_id) } });
     if (!payment) return NextResponse.json({ received: true });
