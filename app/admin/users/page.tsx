@@ -1,0 +1,1 @@
+export default function Users(){return <main className="pt-32 pb-20"><div className="container"><span className="eyebrow">Access</span><h1 className="text-5xl font-black mt-3">Users & roles.</h1><div className="card p-7 mt-10"><p className="muted">Manage customers, club owners, drivers and super-admin permissions from one place.</p></div></div></main>
