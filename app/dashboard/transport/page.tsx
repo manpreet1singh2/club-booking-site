@@ -1,0 +1,1 @@
+export default function Transport(){return <main className="pt-32 pb-20"><div className="container"><span className="eyebrow">Customer portal</span><h1 className="text-5xl font-black mt-3">Transport.</h1><div className="card p-8 mt-10"><p className="muted">Pickup time, location and driver details will appear here when transport is assigned.</p></div></div></main>
