@@ -59,10 +59,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (user.role === "CUSTOMER" && body.status === "CANCELLED" && ["CANCELLED","REFUNDED"].includes(booking.status)) return NextResponse.json({ error: "Booking is already closed" }, { status: 400 });
   if (body.status === "CONFIRMED" && !["PAID","PARTIAL"].includes(booking.paymentStatus)) return NextResponse.json({ error: "Payment must be verified before confirmation" }, { status: 400 });
   if (body.status === "REFUND_PENDING" && !["PAID","PARTIAL"].includes(booking.paymentStatus)) return NextResponse.json({ error: "A paid booking is required before refund processing" }, { status: 400 });
+  if (body.status === "CANCELLED" && ["PAID","PARTIAL"].includes(booking.paymentStatus) && booking.status !== "REFUND_PENDING") body.status = "REFUND_PENDING";
   if (body.status === "REFUNDED" && booking.status !== "REFUND_PENDING") return NextResponse.json({ error: "Booking must be refund-pending first" }, { status: 400 });
   const updated = await prisma.$transaction(async tx => {
     const result = await tx.booking.update({ where: { id }, data: body.status ? { status: body.status as Status } : {} });
     if (body.status === "REFUND_PENDING") await tx.booking.update({ where: { id }, data: { paymentStatus: "PARTIAL" } });
+    if (body.status === "CANCELLED" && booking.transport?.driverId) await tx.driver.update({ where: { id: booking.transport.driverId }, data: { available: true } });
+    if (body.status === "CANCELLED" && booking.transport) await tx.transportBooking.update({ where: { bookingId: id }, data: { status: "CANCELLED" } });
     if (body.status === "REFUNDED") await tx.booking.update({ where: { id }, data: { paymentStatus: "REFUNDED" } });
     return result;
   });
