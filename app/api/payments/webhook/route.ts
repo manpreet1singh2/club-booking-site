@@ -17,6 +17,7 @@ export async function POST(req: Request) {
 
     const payment = await prisma.payment.findUnique({ where: { gatewayOrderId: String(entity.order_id) } });
     if (!payment) return NextResponse.json({ received: true });
+    if (Number(entity.amount || 0) !== Math.round(Number(payment.amount) * 100) || String(entity.currency || "INR") !== "INR") return NextResponse.json({ error: "Webhook payment amount or currency mismatch" }, { status: 400 });
 
     if (event === "payment.captured" || event === "order.paid") {
       let confirmed = false;
