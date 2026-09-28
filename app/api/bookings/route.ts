@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { bookingSchema } from "@/lib/validation";
 import { calculateBookingAmounts, createBookingCode } from "@/lib/booking";
+import { notifyBookingCreated } from "@/lib/notifications";
 
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
@@ -64,6 +65,7 @@ export async function POST(req: NextRequest) {
       },
       include: { club: true, package: true, event: true },
     });
+    notifyBookingCreated(booking.id).catch(() => undefined);
     return NextResponse.json(booking, { status: 201 });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Invalid booking request" }, { status: 400 });
