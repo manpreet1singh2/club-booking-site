@@ -2,7 +2,7 @@ import {z} from "zod";
 export const bookingSchema=z.object({
   userId:z.string().min(1),
   clubId:z.string().min(1),
-  eventId:z.string().min(1).optional(),
+  eventId:z.string().min(1),
   packageId:z.string().min(1),
   guestCount:z.number().int().min(1).max(100),
   visitDate:z.coerce.date(),
