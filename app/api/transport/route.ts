@@ -31,6 +31,7 @@ export async function POST(req:NextRequest){
       const booking=await tx.booking.findUnique({where:{id:bookingId},include:{club:{select:{ownerId:true}}}});
       if(!booking)return {error:"Booking not found",status:404};
       if(user.role==="CLUB_OWNER"&&booking.club.ownerId!==user.id)return {error:"Forbidden",status:403};
+      if(!["CONFIRMED"].includes(booking.status)||!["PAID","PARTIAL"].includes(booking.paymentStatus))return {error:"Booking must be confirmed and paid before transport assignment",status:400};
       if(booking.transportType==="NONE"||!booking.pickupLocation||!booking.pickupTime)return {error:"Booking has no valid transport request",status:400};
 
       const existing=await tx.transportBooking.findUnique({where:{bookingId},include:{driver:true}});
@@ -45,6 +46,7 @@ export async function POST(req:NextRequest){
       if(selectedDriverId){
         const driver=await tx.driver.findUnique({where:{id:selectedDriverId}});
         if(!driver||driver.vehicleType!==booking.transportType)return {error:"Selected driver is invalid for this transport type",status:400};
+        if(existing?.driverId!==selectedDriverId&&!driver.available)return {error:"Selected driver is unavailable",status:409};
 
         if(existing?.driverId!==selectedDriverId){
           const claimed=await tx.driver.updateMany({where:{id:selectedDriverId,available:true},data:{available:false}});
