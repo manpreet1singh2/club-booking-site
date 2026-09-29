@@ -16,7 +16,7 @@ export async function GET() {
 
   const [totalBookings, todayBookings, confirmedBookings, pendingPayments, revenue, advanceRevenue, transportPending, transportActive, clubs, users] = await Promise.all([
     prisma.booking.count({ where: scope }),
-    prisma.booking.count({ where: { ...scope, createdAt: { gte: today, lt: tomorrow } } }),
+    prisma.booking.count({ where: { ...scope, visitDate: { gte: today, lt: tomorrow } } }),
     prisma.booking.count({ where: { ...scope, status: "CONFIRMED" } }),
     prisma.booking.count({ where: { ...scope, paymentStatus: "PENDING" } }),
     prisma.payment.aggregate({ where: { status: "PAID", booking: scope }, _sum: { amount: true } }),
