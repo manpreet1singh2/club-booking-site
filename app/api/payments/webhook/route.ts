@@ -11,29 +11,43 @@ export async function POST(req: Request) {
     const payload = JSON.parse(raw);
     const event = String(payload.event || "");
     const eventId = String(payload.id || "");
-    if (eventId && await prisma.payment.findFirst({ where: { webhookEventId: eventId } })) return NextResponse.json({ received: true, duplicate: true });
     const entity = payload.payload?.payment?.entity;
     if (!entity?.order_id || !entity?.id) return NextResponse.json({ received: true });
+    if (eventId && await prisma.payment.findFirst({ where: { webhookEventId: eventId } })) return NextResponse.json({ received: true, duplicate: true });
 
     const payment = await prisma.payment.findUnique({ where: { gatewayOrderId: String(entity.order_id) } });
     if (!payment) return NextResponse.json({ received: true });
-    if (Number(entity.amount || 0) !== Math.round(Number(payment.amount) * 100) || String(entity.currency || "INR") !== "INR") return NextResponse.json({ error: "Webhook payment amount or currency mismatch" }, { status: 400 });
+    const amountPaise = Number(entity.amount || 0);
+    if (!Number.isSafeInteger(amountPaise) || amountPaise !== Math.round(Number(payment.amount) * 100) || String(entity.currency || "") !== "INR") {
+      return NextResponse.json({ error: "Webhook payment amount or currency mismatch" }, { status: 400 });
+    }
 
     if (event === "payment.captured" || event === "order.paid") {
       if (payment.status === "PAID" && payment.gatewayPaymentId === String(entity.id)) return NextResponse.json({ received: true, duplicate: true });
       let confirmed = false;
-      await prisma.$transaction(async tx => {
-        await tx.payment.update({ where: { id: payment.id }, data: { status: "PAID", gatewayPaymentId: String(entity.id), webhookEventId: eventId || null } });
-        const aggregate = await tx.payment.aggregate({ where: { bookingId: payment.bookingId, status: "PAID" }, _sum: { amount: true } });
-        const paid = Number(aggregate._sum.amount || 0);
-        const booking = await tx.booking.findUnique({ where: { id: payment.bookingId } });
-        if (!booking) return;
-        confirmed = paid >= Number(booking.advanceAmount);
-        await tx.booking.update({ where: { id: booking.id }, data: { paymentStatus: paid >= Number(booking.totalAmount) ? "PAID" : "PARTIAL", status: confirmed ? "CONFIRMED" : "PENDING_PAYMENT" } });
-      });
+      try {
+        await prisma.$transaction(async tx => {
+          const current = await tx.payment.findUnique({ where: { id: payment.id } });
+          if (!current || current.status === "PAID") return;
+          await tx.payment.update({ where: { id: current.id }, data: { status: "PAID", gatewayPaymentId: String(entity.id), webhookEventId: eventId || null, gateway: "razorpay" } });
+          const aggregate = await tx.payment.aggregate({ where: { bookingId: current.bookingId, status: "PAID" }, _sum: { amount: true } });
+          const paid = Number(aggregate._sum.amount || 0);
+          const booking = await tx.booking.findUnique({ where: { id: current.bookingId } });
+          if (!booking) return;
+          confirmed = paid >= Number(booking.advanceAmount);
+          await tx.booking.update({ where: { id: booking.id }, data: { paymentStatus: paid >= Number(booking.totalAmount) ? "PAID" : "PARTIAL", status: confirmed ? "CONFIRMED" : "PENDING_PAYMENT" } });
+        });
+      } catch (error) {
+        if (eventId && error instanceof Error && error.message.toLowerCase().includes("unique")) return NextResponse.json({ received: true, duplicate: true });
+        throw error;
+      }
       if (confirmed) notifyBookingConfirmed(payment.bookingId).catch(() => undefined);
     } else if (event === "payment.failed") {
-      await prisma.payment.update({ where: { id: payment.id }, data: { status: "FAILED", gatewayPaymentId: String(entity.id), webhookEventId: eventId || null } });
+      if (payment.status !== "PAID" && payment.status !== "REFUNDED") {
+        await prisma.payment.update({ where: { id: payment.id }, data: { status: "FAILED", gatewayPaymentId: String(entity.id), webhookEventId: eventId || null, gateway: "razorpay" } }).catch(error => {
+          if (!(eventId && error instanceof Error && error.message.toLowerCase().includes("unique"))) throw error;
+        });
+      }
     }
     return NextResponse.json({ received: true });
   } catch {
