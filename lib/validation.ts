@@ -16,6 +16,10 @@ export const bookingSchema = z.object({
   if (v.pickupTime && v.pickupTime.getTime() < Date.now() - 60000) ctx.addIssue({ code: "custom", path: ["pickupTime"], message: "Pickup time must be in the future" });
 });
 
+export const bookingStatusSchema = z.object({
+  status: z.enum(["CONFIRMED", "CANCELLED", "COMPLETED", "EXPIRED", "REFUND_PENDING", "REFUNDED"]),
+});
+
 export const transportStatusSchema = z.object({
   status: z.enum(["ASSIGNED", "DRIVER_CONFIRMED", "ON_THE_WAY", "ARRIVED", "PICKED_UP", "COMPLETED", "CANCELLED"]),
 });
