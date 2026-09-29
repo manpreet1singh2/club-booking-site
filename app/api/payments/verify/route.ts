@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { verifyRazorpaySignature } from "@/lib/razorpay";
+import { verifyRazorpaySignature, fetchRazorpayPayment } from "@/lib/razorpay";
 import { notifyBookingConfirmed } from "@/lib/notifications";
 
 export async function POST(req: Request) {
@@ -23,6 +23,10 @@ export async function POST(req: Request) {
     if (payment.booking.status !== "PENDING_PAYMENT") return NextResponse.json({ error: "Booking is no longer awaiting initial payment" }, { status: 400 });
     if (!verifyRazorpaySignature(orderId, paymentId, signature)) return NextResponse.json({ error: "Invalid payment signature" }, { status: 400 });
     if (Number(payment.amount) !== Number(payment.booking.advanceAmount)) return NextResponse.json({ error: "Payment amount does not match the expected advance" }, { status: 400 });
+    const gatewayPayment = await fetchRazorpayPayment(paymentId);
+    if (gatewayPayment.id !== paymentId || gatewayPayment.order_id !== orderId || gatewayPayment.currency !== "INR" || gatewayPayment.amount !== Math.round(Number(payment.amount) * 100) || !["captured"].includes(gatewayPayment.status)) {
+      return NextResponse.json({ error: "Gateway payment verification failed" }, { status: 400 });
+    }
 
     const result = await prisma.$transaction(async tx => {
       const updatedPayment = await tx.payment.update({
