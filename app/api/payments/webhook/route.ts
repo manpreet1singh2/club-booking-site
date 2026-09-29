@@ -13,7 +13,15 @@ export async function POST(req: Request) {
     const eventId = String(payload.id || "");
     const entity = payload.payload?.payment?.entity;
     if (!entity?.order_id || !entity?.id) return NextResponse.json({ received: true });
-    if (eventId && await prisma.payment.findFirst({ where: { webhookEventId: eventId } })) return NextResponse.json({ received: true, duplicate: true });
+    if (eventId) {
+      const existingEvent = await prisma.paymentWebhookEvent.findUnique({ where: { eventId } });
+      if (existingEvent?.status === "PROCESSED") return NextResponse.json({ received: true, duplicate: true });
+      if (!existingEvent) {
+        await prisma.paymentWebhookEvent.create({ data: { provider: "razorpay", eventId, event, payload } }).catch(error => {
+          if (!(error instanceof Error && error.message.toLowerCase().includes("unique"))) throw error;
+        });
+      }
+    }
 
     const payment = await prisma.payment.findUnique({ where: { gatewayOrderId: String(entity.order_id) } });
     if (!payment) return NextResponse.json({ received: true });
@@ -41,6 +49,7 @@ export async function POST(req: Request) {
         if (eventId && error instanceof Error && error.message.toLowerCase().includes("unique")) return NextResponse.json({ received: true, duplicate: true });
         throw error;
       }
+      if (eventId) await prisma.paymentWebhookEvent.update({ where: { eventId }, data: { status: "PROCESSED", processedAt: new Date(), error: null } });
       if (confirmed) notifyBookingConfirmed(payment.bookingId).catch(() => undefined);
     } else if (event === "payment.failed") {
       if (payment.status !== "PAID" && payment.status !== "REFUNDED") {
@@ -50,7 +59,13 @@ export async function POST(req: Request) {
       }
     }
     return NextResponse.json({ received: true });
-  } catch {
+  } catch (error) {
+    const message = error instanceof Error ? error.message.slice(0, 500) : "Webhook processing failed";
+    try {
+      const payload = JSON.parse(raw);
+      const eventId = String(payload.id || "");
+      if (eventId) await prisma.paymentWebhookEvent.updateMany({ where: { eventId }, data: { status: "FAILED", error: message } });
+    } catch {}
     return NextResponse.json({ error: "Webhook processing failed" }, { status: 400 });
   }
 }
