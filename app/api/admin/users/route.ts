@@ -3,23 +3,65 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/lib/audit";
 
-export async function GET(){
-  const u=await getCurrentUser();
-  if(u?.role!=="SUPER_ADMIN")return NextResponse.json({error:"FORBIDDEN"},{status:403});
-  return NextResponse.json(await prisma.user.findMany({select:{id:true,name:true,email:true,phone:true,role:true,createdAt:true,_count:{select:{bookings:true}}},orderBy:{createdAt:"desc"}}));
+export async function GET() {
+  const u = await getCurrentUser();
+  if (u?.role !== "SUPER_ADMIN") return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+  return NextResponse.json(await prisma.user.findMany({
+    select: { id: true, name: true, email: true, phone: true, role: true, createdAt: true, _count: { select: { bookings: true } } },
+    orderBy: { createdAt: "desc" },
+  }));
 }
-export async function PATCH(req:Request){
-  const u=await getCurrentUser();
-  if(u?.role!=="SUPER_ADMIN")return NextResponse.json({error:"FORBIDDEN"},{status:403});
-  try{
-    const b=await req.json(),id=String(b.id||""),role=String(b.role||"");
-    if(!id||!["CUSTOMER","CLUB_OWNER","SUPER_ADMIN","DRIVER"].includes(role))return NextResponse.json({error:"Invalid request"},{status:400});
-    if(id===u.id&&role!=="SUPER_ADMIN")return NextResponse.json({error:"You cannot remove your own super-admin access"},{status:400});
-    const target=await prisma.user.findUnique({where:{id},select:{id:true,role:true}});
-    if(!target)return NextResponse.json({error:"User not found"},{status:404});
-    if(target.role==="SUPER_ADMIN"&&role!=="SUPER_ADMIN"&&await prisma.user.count({where:{role:"SUPER_ADMIN"}})<=1)return NextResponse.json({error:"At least one super admin must remain"},{status:400});
-    const updated=await prisma.user.update({where:{id},data:{role:role as never},select:{id:true,name:true,email:true,phone:true,role:true,createdAt:true}});
-    await writeAuditLog({userId:u.id,action:"ROLE_CHANGED",entity:"User",entityId:id,metadata:{from:target.role,to:role}});
+
+export async function PATCH(req: Request) {
+  const u = await getCurrentUser();
+  if (u?.role !== "SUPER_ADMIN") return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+
+  try {
+    const b = await req.json();
+    const id = String(b.id || "");
+    const role = String(b.role || "");
+    if (!id || !["CUSTOMER", "CLUB_OWNER", "SUPER_ADMIN", "DRIVER"].includes(role)) {
+      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    }
+    if (id === u.id && role !== "SUPER_ADMIN") return NextResponse.json({ error: "You cannot remove your own super-admin access" }, { status: 400 });
+
+    const target = await prisma.user.findUnique({
+      where: { id },
+      include: { driver: { include: { assignments: { where: { status: { notIn: ["COMPLETED", "CANCELLED"] } }, select: { id: true } } } } },
+    });
+    if (!target) return NextResponse.json({ error: "User not found" }, { status: 404 });
+
+    if (target.role === "SUPER_ADMIN" && role !== "SUPER_ADMIN" && await prisma.user.count({ where: { role: "SUPER_ADMIN" } }) <= 1) {
+      return NextResponse.json({ error: "At least one super admin must remain" }, { status: 400 });
+    }
+
+    if (role === "DRIVER" && target.role !== "DRIVER") {
+      return NextResponse.json({ error: "Create a driver through the driver management endpoint so vehicle details and the Driver record are provisioned together." }, { status: 409 });
+    }
+
+    if (target.role === "DRIVER" && role !== "DRIVER") {
+      if (target.driver?.assignments.length) {
+        return NextResponse.json({ error: "Driver has active transport assignments. Complete or cancel them before changing this role." }, { status: 409 });
+      }
+      if (!target.driver) {
+        return NextResponse.json({ error: "Driver account is inconsistent: Driver record is missing." }, { status: 409 });
+      }
+    }
+
+    const updated = await prisma.$transaction(async tx => {
+      if (target.role === "DRIVER" && role !== "DRIVER") {
+        await tx.driver.delete({ where: { userId: id } });
+      }
+      return tx.user.update({
+        where: { id },
+        data: { role: role as never },
+        select: { id: true, name: true, email: true, phone: true, role: true, createdAt: true },
+      });
+    });
+
+    await writeAuditLog({ userId: u.id, action: "ROLE_CHANGED", entity: "User", entityId: id, metadata: { from: target.role, to: role } });
     return NextResponse.json(updated);
-  }catch{return NextResponse.json({error:"Unable to update user role"},{status:400});}
+  } catch {
+    return NextResponse.json({ error: "Unable to update user role" }, { status: 400 });
+  }
 }
