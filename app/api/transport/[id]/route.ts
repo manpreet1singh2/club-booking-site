@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { notifyTransportStatus } from "@/lib/notifications";
+import { writeAuditLog } from "@/lib/audit";
 
 const transitions: Record<string,string[]> = {
   ASSIGNED:["DRIVER_CONFIRMED","CANCELLED"],
@@ -42,6 +43,7 @@ export async function PATCH(req:Request,{params}:{params:Promise<{id:string}>}){
     return result;
   });
   if(!updated)return NextResponse.json({error:"Transport booking not found"},{status:404});
+  await writeAuditLog({ userId: user.id, action: "TRANSPORT_STATUS_CHANGED", entity: "TransportBooking", entityId: updated.id, metadata: { from: ride.status, to: next, bookingId: ride.bookingId, driverId: ride.driverId } });
   notifyTransportStatus(updated.id).catch(()=>undefined);
   return NextResponse.json(updated);
 }
