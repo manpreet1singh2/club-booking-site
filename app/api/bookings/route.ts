@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(bookings);
 }
 
-export async function POST(req: NextRequest) {
+function isSerializationConflict(error: unknown) {\n  return typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "P2034";\n}\n\nexport async function POST(req: NextRequest) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
