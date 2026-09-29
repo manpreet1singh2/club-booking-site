@@ -48,7 +48,7 @@ function isSerializationConflict(error: unknown) {\n  return typeof error === "o
     if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
 
     const body = bookingSchema.omit({ userId: true }).parse(await req.json());
-    const booking = await prisma.$transaction(async tx => {
+    let booking;\n    for (let attempt = 1; attempt <= 2; attempt++) {\n      try {\n        booking = await prisma.$transaction(async tx => {
       const pkg = await tx.package.findUnique({ where: { id: body.packageId } });
       if (!pkg || !pkg.active) throw new Error("Package unavailable");
       const club = await tx.club.findUnique({ where: { id: body.clubId } });
