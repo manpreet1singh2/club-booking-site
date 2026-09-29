@@ -13,23 +13,22 @@ export async function POST(req:Request){
     if(!booking)return NextResponse.json({error:"Booking not found"},{status:404});
     if(booking.status!=="REFUND_PENDING")return NextResponse.json({error:"Booking must be refund-pending"},{status:400});
 
-    const captured=booking.payments.filter(p=>p.status==="PAID"&&p.gatewayPaymentId&&!p.refundId);
+    const captured=booking.payments.filter(p=>p.status==="PAID"&&p.gatewayPaymentId);
     if(!captured.length)return NextResponse.json({error:"No captured payment is available for refund"},{status:400});
 
-    const refunds=[];
+    const results=[];
     for(const payment of captured){
+      if(payment.refundId || payment.status==="REFUNDED") continue;
       const amount=Number(payment.amount);
-      if(amount<=0)continue;
+      if(amount<=0) continue;
       const refund=await createRazorpayRefund(payment.gatewayPaymentId!,amount,booking.bookingCode);
-      refunds.push({paymentId:payment.id,refundId:refund.id,amount});
+      await prisma.payment.update({where:{id:payment.id},data:{refundId:refund.id,refundedAmount:amount,status:"REFUNDED"}});
+      results.push({paymentId:payment.id,refundId:refund.id,amount});
     }
-    if(!refunds.length)return NextResponse.json({error:"No refundable payment amount found"},{status:400});
 
-    const total=refunds.reduce((n,r)=>n+r.amount,0);
-    await prisma.$transaction(async tx=>{
-      for(const r of refunds)await tx.payment.update({where:{id:r.paymentId},data:{refundId:r.refundId,refundedAmount:r.amount,status:"REFUNDED"}});
-      await tx.booking.update({where:{id:booking.id},data:{status:"REFUNDED",paymentStatus:"REFUNDED"}});
-    });
-    return NextResponse.json({ok:true,refunds,totalRefunded:total});
+    const remaining=await prisma.payment.count({where:{bookingId:booking.id,status:"PAID",gatewayPaymentId:{not:null}}});
+    if(remaining===0) await prisma.booking.update({where:{id:booking.id},data:{status:"REFUNDED",paymentStatus:"REFUNDED"}});
+
+    return NextResponse.json({ok:true,refunds:results,totalRefunded:results.reduce((n,r)=>n+r.amount,0),completed:remaining===0});
   }catch(e){return NextResponse.json({error:e instanceof Error?e.message:"Refund failed"},{status:400});}
 }
