@@ -57,21 +57,34 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: "Only cancellation is available to customers" }, { status: 403 });
   }
 
+  const allowedTransitions: Record<string, string[]> = {
+    PENDING_PAYMENT: ["CONFIRMED", "CANCELLED", "EXPIRED"],
+    CONFIRMED: ["COMPLETED", "CANCELLED", "REFUND_PENDING"],
+    COMPLETED: [],
+    CANCELLED: [],
+    EXPIRED: [],
+    REFUND_PENDING: ["REFUNDED"],
+    REFUNDED: [],
+  };
+  if (!allowedTransitions[booking.status]?.includes(requestedStatus)) {
+    return NextResponse.json({ error: `Invalid booking status transition from ${booking.status} to ${requestedStatus}` }, { status: 409 });
+  }
+
   if (user.role === "CUSTOMER" && booking.status === "COMPLETED") return NextResponse.json({ error: "Completed bookings cannot be cancelled" }, { status: 400 });
   if (user.role === "CUSTOMER" && body.status === "CANCELLED" && ["CANCELLED","REFUNDED"].includes(booking.status)) return NextResponse.json({ error: "Booking is already closed" }, { status: 400 });
   if (body.status === "CONFIRMED" && !["PAID","PARTIAL"].includes(booking.paymentStatus)) return NextResponse.json({ error: "Payment must be verified before confirmation" }, { status: 400 });
   if (body.status === "REFUND_PENDING" && !["PAID","PARTIAL"].includes(booking.paymentStatus)) return NextResponse.json({ error: "A paid booking is required before refund processing" }, { status: 400 });
-  if (body.status === "CANCELLED" && ["PAID","PARTIAL"].includes(booking.paymentStatus) && booking.status !== "REFUND_PENDING") body.status = "REFUND_PENDING";
+  if (requestedStatus === "CANCELLED" && ["PAID","PARTIAL"].includes(booking.paymentStatus) && booking.status !== "REFUND_PENDING") body.status = "REFUND_PENDING";
   if (body.status === "REFUNDED" && booking.status !== "REFUND_PENDING") return NextResponse.json({ error: "Booking must be refund-pending first" }, { status: 400 });
   if (user.role === "CLUB_OWNER" && body.status === "REFUNDED") return NextResponse.json({ error: "Only super admins can process refunds" }, { status: 403 });
   const updated = await prisma.$transaction(async tx => {
-    const result = await tx.booking.update({ where: { id }, data: body.status ? { status: body.status as Status } : {} });
-    if (body.status === "REFUND_PENDING") await tx.booking.update({ where: { id }, data: { paymentStatus: "PARTIAL" } });
+    const result = await tx.booking.update({ where: { id }, data: { status: requestedStatus as Status } });
+    if (requestedStatus === "REFUND_PENDING") await tx.booking.update({ where: { id }, data: { paymentStatus: "PARTIAL" } });
     if (body.status === "CANCELLED" && booking.transport?.driverId) await tx.driver.update({ where: { id: booking.transport.driverId }, data: { available: true } });
     if (body.status === "CANCELLED" && booking.transport) await tx.transportBooking.update({ where: { bookingId: id }, data: { status: "CANCELLED" } });
-    if (body.status === "REFUNDED") await tx.booking.update({ where: { id }, data: { paymentStatus: "REFUNDED" } });
+    if (requestedStatus === "REFUNDED") await tx.booking.update({ where: { id }, data: { paymentStatus: "REFUNDED" } });
     return result;
   });
-  await writeAuditLog({ userId: user.id, action: body.status ? "BOOKING_STATUS_CHANGED" : "BOOKING_UPDATED", entity: "Booking", entityId: id, metadata: body.status ? { from: booking.status, to: body.status } : undefined });
+  await writeAuditLog({ userId: user.id, action: body.status ? "BOOKING_STATUS_CHANGED" : "BOOKING_UPDATED", entity: "Booking", entityId: id, metadata: body.status ? { from: booking.status, to: requestedStatus } : undefined });
   return NextResponse.json(updated);
 }
