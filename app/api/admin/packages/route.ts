@@ -1,8 +1,5 @@
-import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import { z } from "zod";
-const schema=z.object({clubId:z.string().min(1),name:z.string().min(2),description:z.string().optional(),price:z.coerce.number().positive(),pricing:z.enum(["PER_PERSON","FLAT"]).default("PER_PERSON"),active:z.boolean().optional()});
-async function guard(){const u=await getCurrentUser();return u?.role==="SUPER_ADMIN"?u:null}
-export async function GET(){if(!await guard())return NextResponse.json({error:"FORBIDDEN"},{status:403});return NextResponse.json(await prisma.package.findMany({include:{club:true,_count:{select:{bookings:true}}},orderBy:{createdAt:"desc"}}))}
-export async function POST(req:Request){if(!await guard())return NextResponse.json({error:"FORBIDDEN"},{status:403});const p=schema.safeParse(await req.json());if(!p.success)return NextResponse.json({error:p.error.flatten()},{status:400});return NextResponse.json(await prisma.package.create({data:p.data}),{status:201})}
+import {NextResponse} from "next/server"; import {getCurrentUser} from "@/lib/auth"; import {prisma} from "@/lib/prisma"; import {z} from "zod";
+const schema=z.object({clubId:z.string().min(1),name:z.string().trim().min(2).max(120),description:z.string().max(500).optional(),price:z.coerce.number().positive().max(10000000),pricing:z.enum(["PER_PERSON","FLAT"]).default("PER_PERSON"),active:z.boolean().optional()});
+async function guard(){const u=await getCurrentUser();return u&&["SUPER_ADMIN","CLUB_OWNER"].includes(u.role)?u:null}
+export async function GET(){const u=await guard();if(!u)return NextResponse.json({error:"FORBIDDEN"},{status:403});const where=u.role==="CLUB_OWNER"?{club:{ownerId:u.id}}:{};return NextResponse.json(await prisma.package.findMany({where,include:{club:true,_count:{select:{bookings:true}}},orderBy:{createdAt:"desc"}}))}
+export async function POST(req:Request){const u=await guard();if(!u)return NextResponse.json({error:"FORBIDDEN"},{status:403});const p=schema.safeParse(await req.json());if(!p.success)return NextResponse.json({error:p.error.flatten()},{status:400});const club=await prisma.club.findUnique({where:{id:p.data.clubId},select:{id:true,ownerId:true,active:true}});if(!club||!club.active||(u.role==="CLUB_OWNER"&&club.ownerId!==u.id))return NextResponse.json({error:"Club is not available to this user"},{status:403});return NextResponse.json(await prisma.package.create({data:p.data}),{status:201})}
