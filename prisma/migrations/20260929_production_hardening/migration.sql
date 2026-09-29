@@ -15,3 +15,20 @@ CREATE INDEX "AuditLog_userId_createdAt_idx" ON "AuditLog"("userId", "createdAt"
 CREATE INDEX "AuditLog_entity_entityId_createdAt_idx" ON "AuditLog"("entity", "entityId", "createdAt");
 CREATE INDEX "Session_userId_expiresAt_idx" ON "Session"("userId", "expiresAt");
 CREATE INDEX "Session_expiresAt_idx" ON "Session"("expiresAt");
+
+CREATE TYPE "WebhookEventStatus" AS ENUM ('RECEIVED', 'PROCESSED', 'FAILED');
+CREATE TABLE "PaymentWebhookEvent" (
+  "id" TEXT NOT NULL,
+  "provider" TEXT NOT NULL,
+  "eventId" TEXT NOT NULL,
+  "event" TEXT NOT NULL,
+  "status" "WebhookEventStatus" NOT NULL DEFAULT 'RECEIVED',
+  "payload" JSONB,
+  "error" TEXT,
+  "receivedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "processedAt" TIMESTAMP(3),
+  CONSTRAINT "PaymentWebhookEvent_pkey" PRIMARY KEY ("id")
+);
+CREATE UNIQUE INDEX "PaymentWebhookEvent_eventId_key" ON "PaymentWebhookEvent"("eventId");
+CREATE INDEX "PaymentWebhookEvent_status_receivedAt_idx" ON "PaymentWebhookEvent"("status", "receivedAt");
+CREATE INDEX "PaymentWebhookEvent_event_receivedAt_idx" ON "PaymentWebhookEvent"("event", "receivedAt");
