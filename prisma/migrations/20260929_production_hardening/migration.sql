@@ -47,3 +47,6 @@ CREATE INDEX "NotificationLog_userId_createdAt_idx" ON "NotificationLog"("userId
 
 ALTER TABLE "NotificationLog" ADD COLUMN "recipient" TEXT NOT NULL DEFAULT '';
 ALTER TABLE "NotificationLog" ADD COLUMN "parameters" JSONB;
+
+ALTER TABLE "Payment" ADD COLUMN "orderCreationKey" TEXT;
+CREATE UNIQUE INDEX "Payment_orderCreationKey_key" ON "Payment"("orderCreationKey");
