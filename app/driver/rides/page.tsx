@@ -1,15 +1,16 @@
 "use client";
-import { useEffect, useState } from "react";
-
-type Ride = { id:string; status:string; type:string; pickupLocation:string; pickupTime:string; booking:{bookingCode:string; user:{name:string;phone:string}; club:{name:string}} };
-
-const nextStatus: Record<string,string> = { ASSIGNED:"DRIVER_CONFIRMED", DRIVER_CONFIRMED:"ON_THE_WAY", ON_THE_WAY:"ARRIVED", ARRIVED:"PICKED_UP", PICKED_UP:"COMPLETED" };
-
-export default function DriverRides() {
-  const [rides,setRides]=useState<Ride[]>([]);
-  const [error,setError]=useState("");
-  async function load(){ const r=await fetch("/api/transport"); const d=await r.json(); if(r.ok)setRides(d); else setError(d.error||"Unable to load rides"); }
-  useEffect(()=>{load()},[]);
-  async function advance(id:string,status:string){ const r=await fetch("/api/transport/"+id,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({status})}); if(!r.ok){const d=await r.json();setError(d.error||"Update failed");return;} load(); }
-  return <main className="mx-auto max-w-5xl px-6 py-12"><h1 className="text-3xl font-semibold">My rides</h1>{error&&<p className="mt-4 text-red-300">{error}</p>}<div className="mt-8 space-y-4">{rides.length===0?<div className="rounded-3xl border border-white/10 p-8 text-zinc-400">No assigned rides.</div>:rides.map(ride=><div key={ride.id} className="rounded-3xl border border-white/10 bg-white/[0.03] p-6"><div className="flex flex-wrap items-center justify-between gap-4"><div><div className="font-semibold">{ride.booking.bookingCode} · {ride.booking.club.name}</div><div className="mt-1 text-sm text-zinc-400">{ride.booking.user.name} · {ride.booking.user.phone||"No phone"}</div></div><span className="rounded-full bg-white/10 px-3 py-1 text-xs">{ride.status}</span></div><div className="mt-4 text-sm text-zinc-300">{ride.pickupLocation} · {new Date(ride.pickupTime).toLocaleString()}</div>{nextStatus[ride.status]&&<button onClick={()=>advance(ride.id,nextStatus[ride.status])} className="mt-5 rounded-full bg-lime-300 px-5 py-2 text-sm font-semibold text-black">Mark {nextStatus[ride.status].replaceAll("_"," ")}</button>}</div>)}</div></main>
+import {useEffect,useState} from "react";
+type Ride={id:string;status:string;type:string;pickupLocation:string;pickupTime:string;booking:{bookingCode:string;user:{name:string;phone:string|null};club:{name:string}}};
+const nextStatus:Record<string,string>={ASSIGNED:"DRIVER_CONFIRMED",DRIVER_CONFIRMED:"ON_THE_WAY",ON_THE_WAY:"ARRIVED",ARRIVED:"PICKED_UP",PICKED_UP:"COMPLETED"};
+const labels:Record<string,string>={ASSIGNED:"Confirm ride",DRIVER_CONFIRMED:"Start trip",ON_THE_WAY:"Mark arrived",ARRIVED:"Mark customer picked up",PICKED_UP:"Complete ride"};
+export default function DriverRides(){
+ const [rides,setRides]=useState<Ride[]>([]),[error,setError]=useState(""),[busy,setBusy]=useState("");
+ async function load(){setError("");const r=await fetch("/api/transport");const d=await r.json().catch(()=>[]);if(r.ok)setRides(d);else setError(d.error||"Unable to load rides")}
+ useEffect(()=>{load()},[]);
+ async function advance(id:string,status:string){setBusy(id);setError("");const r=await fetch("/api/transport/"+id,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({status})});const d=await r.json().catch(()=>({}));setBusy("");if(!r.ok){setError(d.error||"Update failed");return}load()}
+ const active=rides.filter(r=>!["COMPLETED","CANCELLED"].includes(r.status)),closed=rides.filter(r=>["COMPLETED","CANCELLED"].includes(r.status));
+ return <main className="pt-28 pb-20"><div className="container max-w-5xl"><span className="eyebrow">Driver Portal</span><h1 className="text-5xl font-black mt-3">My rides.</h1><p className="muted mt-3">Only transport assignments belonging to your driver account are shown.</p>{error&&<div className="card p-4 mt-6 text-red-300">{error}</div>}
+ <section className="mt-8"><h2 className="font-black text-xl">Active rides · {active.length}</h2><div className="space-y-4 mt-4">{active.length===0?<div className="card p-8 muted">No active rides assigned.</div>:active.map(r=><div className="card p-6" key={r.id}><div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4"><div><p className="font-black text-xl">{r.booking.bookingCode}</p><p className="muted mt-1">{r.booking.club.name} · {r.type}</p><p className="mt-4 font-bold">{r.booking.user.name}</p><p className="muted text-sm">{r.booking.user.phone||"No phone number"}</p><p className="muted text-sm mt-3">Pickup: {r.pickupLocation}</p><p className="muted text-sm">Time: {new Date(r.pickupTime).toLocaleString()}</p></div><span className="pill">{r.status.replaceAll("_"," ")}</span></div>{nextStatus[r.status]&&<button disabled={busy===r.id} onClick={()=>advance(r.id,nextStatus[r.status])} className="btn-primary mt-6 disabled:opacity-50">{busy===r.id?"Updating…":labels[r.status]}</button>}</div>)}</div></section>
+ <section className="mt-10"><h2 className="font-black text-xl">Completed / cancelled · {closed.length}</h2><div className="space-y-3 mt-4">{closed.slice(0,10).map(r=><div className="card p-4 flex justify-between gap-4"><div><b>{r.booking.bookingCode}</b><p className="muted text-sm">{r.booking.club.name} · {r.pickupLocation}</p></div><span className="pill">{r.status}</span></div>)}</div></section>
+ </div></main>
 }
