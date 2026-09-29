@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { notifyTransportStatus } from "@/lib/notifications";
 import { writeAuditLog } from "@/lib/audit";
+import { transportStatusSchema } from "@/lib/validation";
 
 const transitions: Record<string,string[]> = {
   ASSIGNED:["DRIVER_CONFIRMED","CANCELLED"],
