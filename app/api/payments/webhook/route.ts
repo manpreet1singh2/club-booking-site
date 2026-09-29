@@ -36,7 +36,10 @@ export async function POST(req: Request) {
       try {
         await prisma.$transaction(async tx => {
           const current = await tx.payment.findUnique({ where: { id: payment.id } });
-          if (!current || current.status === "PAID") return;
+          if (!current || current.status === "PAID" || current.status === "REFUNDED") return;
+          if (current.gatewayPaymentId && current.gatewayPaymentId !== String(entity.id)) {
+            throw new Error("Payment is already linked to a different gateway payment");
+          }
           await tx.payment.update({ where: { id: current.id }, data: { status: "PAID", gatewayPaymentId: String(entity.id), webhookEventId: eventId || null, gateway: "razorpay" } });
           const aggregate = await tx.payment.aggregate({ where: { bookingId: current.bookingId, status: "PAID" }, _sum: { amount: true } });
           const paid = Number(aggregate._sum.amount || 0);
