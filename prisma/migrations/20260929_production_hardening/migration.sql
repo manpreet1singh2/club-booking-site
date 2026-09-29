@@ -44,3 +44,6 @@ ALTER TABLE "NotificationLog"
 CREATE UNIQUE INDEX "NotificationLog_idempotencyKey_key" ON "NotificationLog"("idempotencyKey");
 CREATE INDEX "NotificationLog_status_nextAttemptAt_idx" ON "NotificationLog"("status", "nextAttemptAt");
 CREATE INDEX "NotificationLog_userId_createdAt_idx" ON "NotificationLog"("userId", "createdAt");
+
+ALTER TABLE "NotificationLog" ADD COLUMN "recipient" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "NotificationLog" ADD COLUMN "parameters" JSONB;
