@@ -46,41 +46,70 @@ function isSerializationConflict(error: unknown) {\n  return typeof error === "o
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
-
     const body = bookingSchema.omit({ userId: true }).parse(await req.json());
-    let booking;\n    for (let attempt = 1; attempt <= 2; attempt++) {\n      try {\n        booking = await prisma.$transaction(async tx => {
-      const pkg = await tx.package.findUnique({ where: { id: body.packageId } });
-      if (!pkg || !pkg.active) throw new Error("Package unavailable");
-      const club = await tx.club.findUnique({ where: { id: body.clubId } });
-      if (!club || !club.active || pkg.clubId !== club.id) throw new Error("Club unavailable");
-      if (body.visitDate.getTime() < Date.now() - 60_000) throw new Error("Visit date must be in the future");
 
-      let event = null;
-      if (!body.eventId) throw new Error("An event selection is required");
-      if (body.eventId) {
-        event = await tx.event.findFirst({ where: { id: body.eventId, clubId: club.id, active: true } });
-        if (!event || event.date.toDateString() !== body.visitDate.toDateString()) throw new Error("Selected event is not available on this date");
-        if (event.capacity) {
-          const reserved = await tx.booking.aggregate({ where: { eventId: event.id, status: { in: ["PENDING_PAYMENT","CONFIRMED"] } }, _sum: { guestCount: true } });
-          if ((reserved._sum.guestCount ?? 0) + body.guestCount > event.capacity) throw new Error("Event capacity is full for this group size");
-        }
+    let booking;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        booking = await prisma.$transaction(async tx => {
+          const pkg = await tx.package.findUnique({ where: { id: body.packageId } });
+          if (!pkg || !pkg.active) throw new Error("Package unavailable");
+          const club = await tx.club.findUnique({ where: { id: body.clubId } });
+          if (!club || !club.active || pkg.clubId !== club.id) throw new Error("Club unavailable");
+          if (body.visitDate.getTime() < Date.now() - 60_000) throw new Error("Visit date must be in the future");
+
+          const event = await tx.event.findFirst({ where: { id: body.eventId, clubId: club.id, active: true } });
+          if (!event || event.date.toDateString() !== body.visitDate.toDateString()) {
+            throw new Error("Selected event is not available on this date");
+          }
+
+          if (event.capacity) {
+            const reserved = await tx.booking.aggregate({
+              where: { eventId: event.id, status: { in: ["PENDING_PAYMENT", "CONFIRMED"] } },
+              _sum: { guestCount: true },
+            });
+            if ((reserved._sum.guestCount ?? 0) + body.guestCount > event.capacity) {
+              throw new Error("Event capacity is full for this group size");
+            }
+          }
+
+          if (body.transportType !== "NONE" && (!body.pickupLocation || !body.pickupTime)) {
+            throw new Error("Pickup location and time are required for transport");
+          }
+
+          const amounts = calculateBookingAmounts(Number(pkg.price), body.guestCount, pkg.pricing);
+          return tx.booking.create({
+            data: {
+              bookingCode: createBookingCode(),
+              userId: user.id,
+              clubId: body.clubId,
+              eventId: body.eventId,
+              visitDate: body.visitDate,
+              packageId: body.packageId,
+              guestCount: body.guestCount,
+              transportType: body.transportType,
+              pickupLocation: body.pickupLocation,
+              pickupTime: body.pickupTime,
+              totalAmount: amounts.totalAmount,
+              advanceAmount: amounts.advanceAmount,
+              remainingAmount: amounts.remainingAmount,
+            },
+            include: { club: true, package: true, event: true },
+          });
+        }, { isolationLevel: "Serializable", maxWait: 5000, timeout: 10000 });
+        break;
+      } catch (error) {
+        if (!isSerializationConflict(error) || attempt === 2) throw error;
       }
-      if (body.transportType !== "NONE" && (!body.pickupLocation || !body.pickupTime)) throw new Error("Pickup location and time are required for transport");
-      const amounts = calculateBookingAmounts(Number(pkg.price), body.guestCount, pkg.pricing);
-      return tx.booking.create({
-        data: {
-          bookingCode: createBookingCode(), userId: user.id, clubId: body.clubId, eventId: body.eventId,
-          visitDate: body.visitDate, packageId: body.packageId, guestCount: body.guestCount,
-          transportType: body.transportType, pickupLocation: body.pickupLocation, pickupTime: body.pickupTime,
-          totalAmount: amounts.totalAmount, advanceAmount: amounts.advanceAmount, remainingAmount: amounts.remainingAmount,
-        },
-        include: { club: true, package: true, event: true },
-      });
-    }, { isolationLevel: "Serializable", maxWait: 5000, timeout: 10000 });
+    }
 
+    if (!booking) return NextResponse.json({ error: "Unable to reserve the booking. Please retry." }, { status: 409 });
     notifyBookingCreated(booking.id).catch(() => undefined);
     return NextResponse.json(booking, { status: 201 });
   } catch (error) {
+    if (isSerializationConflict(error)) {
+      return NextResponse.json({ error: "Booking conflicted with another reservation attempt. Please retry." }, { status: 409 });
+    }
     return NextResponse.json({ error: error instanceof Error ? error.message : "Invalid booking request" }, { status: 400 });
   }
 }
