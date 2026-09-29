@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/lib/audit";
+import { driverUpdateSchema } from "@/lib/validation";
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const u = await getCurrentUser();
@@ -9,7 +10,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const id = (await params).id;
   try {
-    const body = await req.json();
+    const parsed = driverUpdateSchema.safeParse(await req.json());\n    if (!parsed.success) return NextResponse.json({ error: "Invalid driver update" }, { status: 400 });\n    const body = parsed.data;
     const existing = await prisma.driver.findUnique({
       where: { id },
       include: {
@@ -22,7 +23,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (body.available === true && existing.assignments.length) return NextResponse.json({ error: "Driver has an active transport assignment" }, { status: 409 });
 
     const data = {
-      vehicleType: body.vehicleType === "BIKE" ? "BIKE" as const : "CAB" as const,
+      vehicleType: body.vehicleType || existing.vehicleType,
       vehicleNumber: body.vehicleNumber ? String(body.vehicleNumber).trim() : null,
       ...(body.available !== undefined ? { available: Boolean(body.available) } : {}),
     };
