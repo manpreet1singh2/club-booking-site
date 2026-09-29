@@ -32,3 +32,15 @@ CREATE TABLE "PaymentWebhookEvent" (
 CREATE UNIQUE INDEX "PaymentWebhookEvent_eventId_key" ON "PaymentWebhookEvent"("eventId");
 CREATE INDEX "PaymentWebhookEvent_status_receivedAt_idx" ON "PaymentWebhookEvent"("status", "receivedAt");
 CREATE INDEX "PaymentWebhookEvent_event_receivedAt_idx" ON "PaymentWebhookEvent"("event", "receivedAt");
+
+ALTER TABLE "NotificationLog"
+  ADD COLUMN "idempotencyKey" TEXT NOT NULL DEFAULT gen_random_uuid()::text,
+  ADD COLUMN "attempt" INTEGER NOT NULL DEFAULT 1,
+  ADD COLUMN "maxAttempts" INTEGER NOT NULL DEFAULT 3,
+  ADD COLUMN "nextAttemptAt" TIMESTAMP(3),
+  ADD COLUMN "lastError" TEXT,
+  ADD COLUMN "sentAt" TIMESTAMP(3),
+  ADD COLUMN "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
+CREATE UNIQUE INDEX "NotificationLog_idempotencyKey_key" ON "NotificationLog"("idempotencyKey");
+CREATE INDEX "NotificationLog_status_nextAttemptAt_idx" ON "NotificationLog"("status", "nextAttemptAt");
+CREATE INDEX "NotificationLog_userId_createdAt_idx" ON "NotificationLog"("userId", "createdAt");
