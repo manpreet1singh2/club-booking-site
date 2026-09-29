@@ -17,5 +17,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
   });
   if (!booking) return NextResponse.json({ valid: false, error: "Ticket not found" }, { status: 404 });
   const valid = booking.status === "CONFIRMED" && ["PAID","PARTIAL"].includes(booking.paymentStatus);
-  return NextResponse.json({ valid, ticket: booking, viewerRole: viewer?.role || null });
+  const staff = viewer?.role === "SUPER_ADMIN" || viewer?.role === "CLUB_OWNER";
+  if (viewer?.role === "CLUB_OWNER") { const owned = await prisma.club.findFirst({ where: { name: booking.club.name, ownerId: viewer.id }, select: { id: true } }); if (!owned) return NextResponse.json({ valid: false, error: "Forbidden", viewerRole: viewer.role }, { status: 403 }); }
+  return NextResponse.json({ valid, ticket: booking, viewerRole: viewer?.role || null, staff });
 }
