@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { writeAuditLog } from "@/lib/audit";
 
 const statuses = ["CONFIRMED", "CANCELLED", "COMPLETED", "EXPIRED", "REFUND_PENDING", "REFUNDED"] as const;
 type Status = typeof statuses[number];
@@ -71,5 +72,6 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (body.status === "REFUNDED") await tx.booking.update({ where: { id }, data: { paymentStatus: "REFUNDED" } });
     return result;
   });
+  await writeAuditLog({ userId: user.id, action: body.status ? "BOOKING_STATUS_CHANGED" : "BOOKING_UPDATED", entity: "Booking", entityId: id, metadata: body.status ? { from: booking.status, to: body.status } : undefined });
   return NextResponse.json(updated);
 }
