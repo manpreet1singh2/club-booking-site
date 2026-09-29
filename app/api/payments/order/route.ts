@@ -14,8 +14,9 @@ export async function POST(req: Request) {
     if (booking.userId !== user.id && user.role !== "SUPER_ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     if (booking.status !== "PENDING_PAYMENT") return NextResponse.json({ error: "Booking is not awaiting payment" }, { status: 400 });
 
-    const existing = await prisma.payment.findFirst({ where: { bookingId: booking.id, status: "PENDING", gatewayOrderId: { not: null } }, orderBy: { createdAt: "desc" } });
-    if (existing?.gatewayOrderId) return NextResponse.json({ orderId: existing.gatewayOrderId, amount: Number(booking.advanceAmount), currency: "INR", keyId: process.env.PAYMENT_KEY_ID });
+    const existing = await prisma.payment.findUnique({ where: { orderCreationKey: "booking:" + booking.id + ":advance" } });
+    if (existing?.gatewayOrderId && existing.status === "PENDING") return NextResponse.json({ orderId: existing.gatewayOrderId, amount: Number(booking.advanceAmount), currency: "INR", keyId: process.env.PAYMENT_KEY_ID });
+    if (existing && existing.status === "PENDING") return NextResponse.json({ error: "Payment order is already being created. Please retry shortly." }, { status: 409 });
 
     const expectedAdvance = Number(booking.advanceAmount);
     if (!Number.isFinite(expectedAdvance) || expectedAdvance <= 0) return NextResponse.json({ error: "Invalid payment amount" }, { status: 400 });
@@ -23,7 +24,7 @@ export async function POST(req: Request) {
     const orderCreationKey = "booking:" + booking.id + ":advance";
     let reservation;
     try {
-      reservation = await prisma.payment.create({ data: { bookingId: booking.id, amount: booking.advanceAmount, status: "PENDING", gateway: "razorpay", orderCreationKey } });
+      if (!reservation) reservation = await prisma.payment.create({ data: { bookingId: booking.id, amount: booking.advanceAmount, status: "PENDING", gateway: "razorpay", orderCreationKey } });
     } catch (error) {
       if (typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "P2002") {
         const raced = await prisma.payment.findUnique({ where: { orderCreationKey } });
