@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { createSession, SESSION_COOKIE, SESSION_TTL_SECONDS, verifyPassword } from "@/lib/auth";
 
 export async function POST(req: Request) {
