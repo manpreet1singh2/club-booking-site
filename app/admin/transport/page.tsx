@@ -1,13 +1,13 @@
 "use client";
 import {useEffect,useState} from "react";
 type D={id:string;vehicleType:string;vehicleNumber:string|null;available:boolean;user:{id:string;name:string;email:string;phone:string|null}};
-type R={id:string;status:string;type:string;pickupLocation:string;pickupTime:string;booking:{bookingCode:string;user:{name:string;phone:string|null};club:{name:string}};driver:{id:string;user:{name:string}}|null};
+type R={id:string;status:string;type:string;pickupLocation:string;pickupTime:string;booking:{id:string;bookingCode:string;user:{name:string;phone:string|null};club:{name:string}};driver:{id:string;user:{name:string}}|null};
 export default function TransportAdmin(){
  const [drivers,setDrivers]=useState<D[]>([]),[rides,setRides]=useState<R[]>([]),[role,setRole]=useState(""),[form,setForm]=useState({name:"",email:"",phone:"",password:"",vehicleType:"CAB",vehicleNumber:""});
  const load=()=>{fetch("/api/drivers").then(r=>r.ok?r.json():[]).then(setDrivers);fetch("/api/transport").then(r=>r.ok?r.json():[]).then(setRides)};useEffect(()=>{fetch("/api/auth/me").then(r=>r.ok?r.json():null).then(x=>x?.role&&setRole(x.role));load()},[]);
  async function add(){const r=await fetch("/api/drivers",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(form)});if(!r.ok){alert((await r.json().catch(()=>({}))).error||"Unable to create driver");return}setForm({...form,name:"",email:"",phone:"",password:"",vehicleNumber:""});load();}
  async function toggle(d:D){const r=await fetch("/api/drivers/"+d.id,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({vehicleType:d.vehicleType,vehicleNumber:d.vehicleNumber,available:!d.available})});if(!r.ok)alert((await r.json().catch(()=>({}))).error||"Unable to update driver");load();}
- async function assign(ride:R,driverId:string){const r=await fetch("/api/transport",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({bookingId:ride.booking.bookingCode,driverId})});if(!r.ok){alert("Use the booking record to assign transport.");return}load();}
+ async function assign(ride:R,driverId:string){const r=await fetch("/api/transport",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({bookingId:ride.booking.id,driverId})});if(!r.ok){alert("Use the booking record to assign transport.");return}load();}
  async function status(id:string,status:string){const r=await fetch("/api/transport/"+id,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({status}));if(!r.ok)alert((await r.json().catch(()=>({}))).error||"Unable to update ride");load();}
  const next=(s:string)=>({PENDING:"ASSIGNED",ASSIGNED:"DRIVER_CONFIRMED",DRIVER_CONFIRMED:"ON_THE_WAY",ON_THE_WAY:"ARRIVED",ARRIVED:"PICKED_UP",PICKED_UP:"COMPLETED"} as Record<string,string>)[s];
  return <main className="pt-32 pb-20"><div className="container"><span className="eyebrow">Operations</span><h1 className="text-5xl font-black mt-3">Transport.</h1>
