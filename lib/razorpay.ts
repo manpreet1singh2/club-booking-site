@@ -21,6 +21,17 @@ export async function createRazorpayOrder(amount: number, receipt: string) {
   return response.json() as Promise<{ id: string; amount: number; currency: string; status: string; receipt: string }>;
 }
 
+export async function fetchRazorpayPayment(paymentId: string) {
+  const { keyId, keySecret } = requireRazorpayConfig();
+  const auth = Buffer.from(keyId + ":" + keySecret).toString("base64");
+  const response = await fetch("https://api.razorpay.com/v1/payments/" + encodeURIComponent(paymentId), {
+    headers: { Authorization: "Basic " + auth },
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error("Unable to verify payment with gateway");
+  return response.json() as Promise<{ id: string; order_id: string; amount: number; currency: string; status: string }>;
+}
+
 export function verifyRazorpaySignature(orderId: string, paymentId: string, signature: string) {
   const { keySecret } = requireRazorpayConfig();
   const expected = crypto.createHmac("sha256", keySecret).update(orderId + "|" + paymentId).digest("hex");
