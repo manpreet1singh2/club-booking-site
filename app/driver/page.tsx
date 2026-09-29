@@ -1,16 +1,2 @@
-import Link from "next/link";
-
-export default function DriverDashboard() {
-  return (
-    <main className="mx-auto max-w-6xl px-6 py-16">
-      <p className="text-sm font-medium uppercase tracking-[0.2em] text-lime-300">Driver Portal</p>
-      <h1 className="mt-3 text-4xl font-semibold tracking-tight">Your assigned rides, in one place.</h1>
-      <p className="mt-4 max-w-2xl text-zinc-400">Confirm a ride, update pickup progress, and close the trip when the customer is safely dropped off.</p>
-      <div className="mt-10 grid gap-4 sm:grid-cols-2">
-        <Link href="/driver/rides" className="rounded-3xl border border-white/10 bg-white/[0.03] p-6 hover:bg-white/[0.06]">
-          <div className="text-xl font-semibold">My rides</div><div className="mt-2 text-sm text-zinc-400">View and update assigned transport bookings.</div>
-        </Link>
-      </div>
-    </main>
-  );
-}
+import Link from "next/link"; import {prisma} from "@/lib/prisma"; import {getCurrentUser} from "@/lib/auth";
+export default async function DriverDashboard(){const u=await getCurrentUser();if(!u)return null;const driver=await prisma.driver.findUnique({where:{userId:u.id},include:{assignments:{where:{status:{notIn:["COMPLETED","CANCELLED"]}},orderBy:{pickupTime:"asc"},include:{booking:{include:{club:true}}}}}});const next=driver?.assignments[0];return <main className="pt-28 pb-20"><div className="container max-w-5xl"><span className="eyebrow">Driver Portal</span><h1 className="text-5xl font-black mt-3">Ready for the road.</h1><div className="grid md:grid-cols-3 gap-4 mt-10"><div className="card p-6"><p className="muted text-sm">Vehicle</p><p className="text-2xl font-black mt-2">{driver?.vehicleType||"—"}</p><p className="muted text-sm mt-1">{driver?.vehicleNumber||"No vehicle number"}</p></div><div className="card p-6"><p className="muted text-sm">Availability</p><p className="text-2xl font-black mt-2">{driver?.available?"Available":"Busy"}</p></div><div className="card p-6"><p className="muted text-sm">Active rides</p><p className="text-2xl font-black mt-2">{driver?.assignments.length||0}</p></div></div>{next&&<div className="card p-6 mt-6"><p className="eyebrow">Next pickup</p><h2 className="text-2xl font-black mt-2">{next.booking.bookingCode} · {next.booking.club.name}</h2><p className="muted mt-2">{next.pickupLocation} · {new Date(next.pickupTime).toLocaleString()}</p><Link href="/driver/rides" className="btn-primary inline-block mt-5">Open rides</Link></div>}<Link href="/driver/rides" className="btn-secondary inline-block mt-6">View all rides</Link></div></main>}
