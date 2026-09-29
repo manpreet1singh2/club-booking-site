@@ -53,3 +53,6 @@ CREATE UNIQUE INDEX "Payment_orderCreationKey_key" ON "Payment"("orderCreationKe
 
 ALTER TABLE "Payment" ADD COLUMN "refundReceipt" TEXT;
 CREATE UNIQUE INDEX "Payment_refundReceipt_key" ON "Payment"("refundReceipt");
+
+ALTER TABLE "NotificationLog" ADD COLUMN "lockedAt" TIMESTAMP(3);
+CREATE INDEX "NotificationLog_lockedAt_idx" ON "NotificationLog"("lockedAt");
