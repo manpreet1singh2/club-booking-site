@@ -13,7 +13,7 @@ function normalizePhone(value: string) {
   return digits.length === 10 ? "91" + digits : digits;
 }
 
-export async function retryNotification(notificationId: string) {\n  const log = await prisma.notificationLog.findUnique({ where: { id: notificationId } });\n  if (!log || log.channel !== "WHATSAPP" || !["RETRY_PENDING", "PENDING"].includes(log.status)) return { sent: false, skipped: true };\n  return sendWhatsApp({ to: "", template: log.template, userId: log.userId, idempotencyKey: log.idempotencyKey });\n}\n\nasync function sendWhatsApp(message: TemplateMessage) {
+export async function retryNotification(notificationId: string) {\n  const log = await prisma.notificationLog.findUnique({ where: { id: notificationId } });\n  if (!log || log.channel !== "WHATSAPP" || !["RETRY_PENDING", "PENDING"].includes(log.status)) return { sent: false, skipped: true };\n  return sendWhatsApp({ to: log.recipient, template: log.template, parameters: Array.isArray(log.parameters) ? log.parameters.map(String) : undefined, userId: log.userId, idempotencyKey: log.idempotencyKey });\n}\n\nasync function sendWhatsApp(message: TemplateMessage) {
   const existing = await prisma.notificationLog.findUnique({ where: { idempotencyKey: message.idempotencyKey } });
   if (existing?.status === "SENT") return { sent: true, duplicate: true };
 
