@@ -37,6 +37,7 @@ export async function getCurrentUser() {
   });
 
   if (!session) return null;
+  if (!session.user) return null;
   if (session.expiresAt <= new Date()) {
     await prisma.session.delete({ where: { id: session.id } }).catch(() => undefined);
     return null;
