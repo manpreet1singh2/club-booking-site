@@ -50,3 +50,6 @@ ALTER TABLE "NotificationLog" ADD COLUMN "parameters" JSONB;
 
 ALTER TABLE "Payment" ADD COLUMN "orderCreationKey" TEXT;
 CREATE UNIQUE INDEX "Payment_orderCreationKey_key" ON "Payment"("orderCreationKey");
+
+ALTER TABLE "Payment" ADD COLUMN "refundReceipt" TEXT;
+CREATE UNIQUE INDEX "Payment_refundReceipt_key" ON "Payment"("refundReceipt");
