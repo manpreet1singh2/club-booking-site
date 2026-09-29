@@ -38,10 +38,10 @@ export async function PATCH(req:Request,{params}:{params:Promise<{id:string}>}){
     if(!["CONFIRMED","COMPLETED"].includes(current.booking.status)||!["PAID","PARTIAL"].includes(current.booking.paymentStatus)){
       throw new Error("Booking is not active for transport");
     }
-    const result=await tx.transportBooking.update({where:{id},data:{status:next as never}});
+    const result=await tx.transportBooking.updateMany({where:{id,status:ride.status as never},data:{status:next as never}});\n    if (result.count !== 1) throw new Error("Transport status changed concurrently. Please refresh and retry.");\n    const updated = await tx.transportBooking.findUniqueOrThrow({where:{id}});
     if((next==="COMPLETED"||next==="CANCELLED")&&ride.driverId)await tx.driver.update({where:{id:ride.driverId},data:{available:true}});
     else if(ride.driverId&&next==="DRIVER_CONFIRMED")await tx.driver.update({where:{id:ride.driverId},data:{available:false}});
-    return result;
+    return updated;
   });
   if(!updated)return NextResponse.json({error:"Transport booking not found"},{status:404});
   await writeAuditLog({ userId: user.id, action: "TRANSPORT_STATUS_CHANGED", entity: "TransportBooking", entityId: updated.id, metadata: { from: ride.status, to: next, bookingId: ride.bookingId, driverId: ride.driverId } });
