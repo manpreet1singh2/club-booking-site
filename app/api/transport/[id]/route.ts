@@ -28,6 +28,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (user.role === "CLUB_OWNER" && ride.booking.club.ownerId !== user.id) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   if (!privileged && !ownDriver) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  if (user.role === "DRIVER" && next === "CANCELLED") return NextResponse.json({ error: "Drivers cannot cancel assigned rides" }, { status: 403 });
   if (!Object.prototype.hasOwnProperty.call(transitions, ride.status) || !transitions[ride.status].includes(next)) {
     return NextResponse.json({ error: "Invalid transport status transition" }, { status: 400 });
   }
