@@ -20,7 +20,7 @@ export async function PATCH(req:Request,{params}:{params:Promise<{id:string}>}){
   const {id}=await params;
   let body:unknown;
   try{body=await req.json()}catch{return NextResponse.json({error:"Invalid JSON"},{status:400})}
-  const next=typeof body==="object"&&body&&"status" in body?String((body as {status?:unknown}).status||""):"";
+  const parsed=transportStatusSchema.safeParse(body);\n  if(!parsed.success)return NextResponse.json({error:"Invalid transport status"},{status:400});\n  const next=parsed.data.status;
 
   const ride=await prisma.transportBooking.findUnique({where:{id},include:{driver:true,booking:{include:{club:{select:{ownerId:true}},user:{select:{id:true}}}}}});
   if(!ride)return NextResponse.json({error:"Transport booking not found"},{status:404});
