@@ -20,6 +20,7 @@ export async function POST(req: Request) {
     if (payment.booking.userId !== user.id && user.role !== "SUPER_ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     if (payment.status === "PAID") return NextResponse.json({ ok: true, alreadyProcessed: true });
+    if (payment.booking.status !== "PENDING_PAYMENT") return NextResponse.json({ error: "Booking is no longer awaiting initial payment" }, { status: 400 });
     if (!verifyRazorpaySignature(orderId, paymentId, signature)) return NextResponse.json({ error: "Invalid payment signature" }, { status: 400 });
     if (Number(payment.amount) !== Number(payment.booking.advanceAmount)) return NextResponse.json({ error: "Payment amount does not match the expected advance" }, { status: 400 });
 
