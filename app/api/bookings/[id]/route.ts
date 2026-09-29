@@ -40,10 +40,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const { id } = await params;
   const body = await req.json();
-  const booking = await prisma.booking.findUnique({ where: { id }, include: { transport: true } });
+  const booking = await prisma.booking.findUnique({ where: { id }, include: { transport: true, club: { select: { ownerId: true } } } });
   if (!booking) return NextResponse.json({ error: "Booking not found" }, { status: 404 });
 
   const privileged = user.role === "SUPER_ADMIN" || user.role === "CLUB_OWNER";
+  if (user.role === "CLUB_OWNER" && booking.club.ownerId !== user.id) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   if (!privileged && booking.userId !== user.id) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   if (body.status && !statuses.includes(body.status as Status)) {
@@ -61,6 +62,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (body.status === "REFUND_PENDING" && !["PAID","PARTIAL"].includes(booking.paymentStatus)) return NextResponse.json({ error: "A paid booking is required before refund processing" }, { status: 400 });
   if (body.status === "CANCELLED" && ["PAID","PARTIAL"].includes(booking.paymentStatus) && booking.status !== "REFUND_PENDING") body.status = "REFUND_PENDING";
   if (body.status === "REFUNDED" && booking.status !== "REFUND_PENDING") return NextResponse.json({ error: "Booking must be refund-pending first" }, { status: 400 });
+  if (user.role === "CLUB_OWNER" && body.status === "REFUNDED") return NextResponse.json({ error: "Only super admins can process refunds" }, { status: 403 });
   const updated = await prisma.$transaction(async tx => {
     const result = await tx.booking.update({ where: { id }, data: body.status ? { status: body.status as Status } : {} });
     if (body.status === "REFUND_PENDING") await tx.booking.update({ where: { id }, data: { paymentStatus: "PARTIAL" } });
