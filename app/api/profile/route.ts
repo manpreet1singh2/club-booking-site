@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import {NextResponse} from "next/server";
+import {getCurrentUser} from "@/lib/auth";
+import {prisma} from "@/lib/prisma";
+function normalizePhone(value:unknown){if(value==null||value==="")return null;const phone=String(value).trim().replace(/[\s()-]/g,"");if(!/^\+?[1-9]\d{7,14}$/.test(phone))throw new Error("Enter a valid phone number");return phone}
 export async function GET(){const u=await getCurrentUser();if(!u)return NextResponse.json({error:"Authentication required"},{status:401});return NextResponse.json({id:u.id,name:u.name,email:u.email,phone:u.phone,role:u.role});}
-export async function PATCH(req:Request){const u=await getCurrentUser();if(!u)return NextResponse.json({error:"Authentication required"},{status:401});const b=await req.json();const name=String(b.name||"").trim(),phone=b.phone?String(b.phone).trim():null;if(name.length<2)return NextResponse.json({error:"Name is required"},{status:400});const updated=await prisma.user.update({where:{id:u.id},data:{name,phone}});return NextResponse.json({id:updated.id,name:updated.name,email:updated.email,phone:updated.phone,role:updated.role});}
+export async function PATCH(req:Request){const u=await getCurrentUser();if(!u)return NextResponse.json({error:"Authentication required"},{status:401});try{const b=await req.json();const name=String(b.name||"").trim();if(name.length<2||name.length>120)return NextResponse.json({error:"Name must be between 2 and 120 characters"},{status:400});const phone=normalizePhone(b.phone);const updated=await prisma.user.update({where:{id:u.id},data:{name,phone}});return NextResponse.json({id:updated.id,name:updated.name,email:updated.email,phone:updated.phone,role:updated.role})}catch(e){return NextResponse.json({error:e instanceof Error?e.message:"Unable to update profile"},{status:400})}}
