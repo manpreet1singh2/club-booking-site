@@ -20,6 +20,7 @@ export async function POST(req: Request) {
     if (Number(entity.amount || 0) !== Math.round(Number(payment.amount) * 100) || String(entity.currency || "INR") !== "INR") return NextResponse.json({ error: "Webhook payment amount or currency mismatch" }, { status: 400 });
 
     if (event === "payment.captured" || event === "order.paid") {
+      if (payment.status === "PAID" && payment.gatewayPaymentId === String(entity.id)) return NextResponse.json({ received: true, duplicate: true });
       let confirmed = false;
       await prisma.$transaction(async tx => {
         await tx.payment.update({ where: { id: payment.id }, data: { status: "PAID", gatewayPaymentId: String(entity.id), webhookEventId: eventId || null } });
