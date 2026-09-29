@@ -39,7 +39,7 @@ export async function POST(req: Request) {
         where: { id: payment.bookingId },
         data: { paymentStatus: paid >= Number(payment.booking.totalAmount) ? "PAID" : "PARTIAL", status: paid >= Number(payment.booking.advanceAmount) ? "CONFIRMED" : "PENDING_PAYMENT" },
       });
-      return { updatedPayment, updatedBooking };
+      return { updatedPayment: await tx.payment.findUniqueOrThrow({ where: { id: payment.id } }), updatedBooking };
     });
 
     if (result.updatedBooking.status === "CONFIRMED") notifyBookingConfirmed(result.updatedBooking.id).catch(() => undefined);
