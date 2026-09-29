@@ -23,7 +23,24 @@ model PaymentWebhookEvent { id String @id @default(cuid()) provider String event
 model Driver { id String @id @default(cuid()) userId String @unique user User @relation(fields:[userId],references:[id]) vehicleType TransportType vehicleNumber String? available Boolean @default(true) assignments TransportBooking[] }
 model TransportBooking { id String @id @default(cuid()) bookingId String @unique booking Booking @relation(fields:[bookingId],references:[id]) driverId String? driver Driver? @relation(fields:[driverId],references:[id]) type TransportType status TransportStatus @default(PENDING) pickupLocation String pickupTime DateTime }
 model PromoCode { id String @id @default(cuid()) code String @unique type String value Decimal @db.Decimal(10,2) active Boolean @default(true) expiresAt DateTime? }
-model NotificationLog { id String @id @default(cuid()) userId String? channel String template String status String providerMessageId String? createdAt DateTime @default(now()) }
+model NotificationLog {
+  id String @id @default(cuid())
+  idempotencyKey String @unique
+  userId String?
+  channel String
+  template String
+  status String
+  providerMessageId String?
+  attempt Int @default(1)
+  maxAttempts Int @default(3)
+  nextAttemptAt DateTime?
+  lastError String?
+  sentAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([status, nextAttemptAt])
+  @@index([userId, createdAt])
+}
 model AuditLog { id String @id @default(cuid()) userId String? action String entity String entityId String? metadata Json? createdAt DateTime @default(now()) }
 model Session { id String @id @default(cuid()) tokenHash String @unique userId String user User @relation(fields:[userId],references:[id],onDelete:Cascade) expiresAt DateTime createdAt DateTime @default(now())
   @@index([userId, expiresAt])
