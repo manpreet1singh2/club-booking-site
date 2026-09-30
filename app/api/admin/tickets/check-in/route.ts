@@ -12,9 +12,9 @@ export async function POST(req:Request){
   if(!user||!["SUPER_ADMIN","CLUB_OWNER"].includes(user.role))return NextResponse.json({error:"Forbidden"},{status:403});
   try{
     const {token}=await req.json();
-    if(!token)return NextResponse.json({error:"Ticket token is required"},{status:400});
+    if(typeof token!=="string"||!token||token.length>200||!/^[A-Za-z0-9_-]+$/.test(token))return NextResponse.json({error:"Invalid ticket token"},{status:400});
     const result=await prisma.$transaction(async tx=>{
-      const booking=await tx.booking.findUnique({where:{ticketToken:String(token)},include:{club:true,checkIn:true,event:true,package:true,user:{select:{name:true}}}});
+      const booking=await tx.booking.findUnique({where:{ticketToken:token},include:{club:true,checkIn:true,event:true,package:true,user:{select:{name:true}}}});
       if(!booking)return {error:"Ticket not found",status:404};
       if(user.role==="CLUB_OWNER"&&booking.club.ownerId!==user.id)return {error:"Forbidden",status:403};
       if(booking.status!=="CONFIRMED"||!["PAID","PARTIAL"].includes(booking.paymentStatus))return {error:"Ticket is not valid for entry",status:400};
