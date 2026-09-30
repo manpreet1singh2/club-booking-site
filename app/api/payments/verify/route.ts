@@ -20,7 +20,7 @@ export async function POST(req: Request) {
     if (payment.booking.userId !== user.id && user.role !== "SUPER_ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     if (payment.status === "PAID") return NextResponse.json({ ok: true, alreadyProcessed: true });
-    if (payment.booking.status !== "PENDING_PAYMENT") return NextResponse.json({ error: "Booking is no longer awaiting initial payment" }, { status: 400 });
+    if (payment.booking.status !== "PENDING_PAYMENT" && payment.status !== "PAID") return NextResponse.json({ error: "Booking is no longer awaiting initial payment" }, { status: 400 });
     if (!verifyRazorpaySignature(orderId, paymentId, signature)) return NextResponse.json({ error: "Invalid payment signature" }, { status: 400 });
     if (Number(payment.amount) !== Number(payment.booking.advanceAmount)) return NextResponse.json({ error: "Payment amount does not match the expected advance" }, { status: 400 });
     const gatewayPayment = await fetchRazorpayPayment(paymentId);
@@ -29,10 +29,13 @@ export async function POST(req: Request) {
     }
 
     const result = await prisma.$transaction(async tx => {
-      const updatedPayment = await tx.payment.update({
-        where: { id: payment.id },
-        data: { status: "PAID", gatewayPaymentId: paymentId, gatewaySignature: signature },
-      });
+      const claimed = await tx.payment.updateMany({ where: { id: payment.id, status: { in: ["PENDING", "FAILED", "PARTIAL"] }, gatewayPaymentId: null }, data: { status: "PAID", gatewayPaymentId: paymentId, gatewaySignature: signature } });
+      if (claimed.count !== 1) {
+        const current = await tx.payment.findUnique({ where: { id: payment.id } });
+        if (current?.status === "PAID" && current.gatewayPaymentId === paymentId) return { updatedPayment: current, updatedBooking: payment.booking, alreadyProcessed: true };
+        throw new Error("PAYMENT_STATE_CONFLICT");
+      }
+      const updatedPayment = await tx.payment.findUniqueOrThrow({ where: { id: payment.id } });
       const aggregate = await tx.payment.aggregate({ where: { bookingId: payment.bookingId, status: "PAID" }, _sum: { amount: true } });
       const paid = Number(aggregate._sum.amount || 0);
       const updatedBooking = await tx.booking.update({
@@ -42,7 +45,7 @@ export async function POST(req: Request) {
       return { updatedPayment: await tx.payment.findUniqueOrThrow({ where: { id: payment.id } }), updatedBooking };
     });
 
-    if (result.updatedBooking.status === "CONFIRMED") notifyBookingConfirmed(result.updatedBooking.id).catch(() => undefined);
+    if (!result.alreadyProcessed && result.updatedBooking.status === "CONFIRMED") notifyBookingConfirmed(result.updatedBooking.id).catch(() => undefined);
     return NextResponse.json({ ok: true, booking: result.updatedBooking });
   } catch {
     return NextResponse.json({ error: "Payment verification failed" }, { status: 400 });
