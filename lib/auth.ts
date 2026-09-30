@@ -59,7 +59,8 @@ export async function revokeCurrentSession() {
   if (token) await prisma.session.deleteMany({ where: { tokenHash: hashSessionToken(token) } });
 }
 
-export async function cleanupExpiredSessions(limit = 500) {\n  const safeLimit = Math.max(1, Math.min(limit, 5000));
+export async function cleanupExpiredSessions(limit = 500) {
+  const safeLimit = Math.max(1, Math.min(limit, 5000));
   const expired = await prisma.session.findMany({
     where: { expiresAt: { lte: new Date() } },
     select: { id: true },
