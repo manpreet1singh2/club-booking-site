@@ -9,9 +9,12 @@ export async function POST(req: Request) {
   }
 
   const deleted = await cleanupExpiredSessions(500);
+  const staleLoginAttempts = await prisma.loginAttempt.deleteMany({
+    where: { updatedAt: { lt: new Date(Date.now() - 24 * 60 * 60_000) } },
+  });
   const expired = await prisma.booking.updateMany({
     where: { status: "PENDING_PAYMENT", paymentStatus: "PENDING", expiresAt: { lte: new Date() } },
     data: { status: "EXPIRED" },
   });
-  return NextResponse.json({ deleted, expiredBookings: expired.count });
+  return NextResponse.json({ deleted, staleLoginAttempts: staleLoginAttempts.count, expiredBookings: expired.count });
 }
