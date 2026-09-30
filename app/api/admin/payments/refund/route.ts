@@ -24,6 +24,9 @@ export async function POST(req: Request) {
     for (const payment of captured) {
       const receipt = "refund:" + payment.id;
       if (payment.refundId) continue;
+      const amount = Number(payment.amount);
+      if (!Number.isFinite(amount) || amount <= 0) continue;
+
       const claim = await prisma.payment.updateMany({
         where: { id: payment.id, status: "PAID", refundId: null, refundStartedAt: null },
         data: { refundStartedAt: new Date() },
@@ -33,9 +36,6 @@ export async function POST(req: Request) {
         if (current?.refundId) continue;
         return NextResponse.json({ error: "Refund is already being processed for this payment" }, { status: 409 });
       }
-
-      const amount = Number(payment.amount);
-      if (amount <= 0) continue;
 
       let refund;
       try {
