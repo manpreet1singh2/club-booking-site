@@ -26,5 +26,8 @@ export async function POST(req:Request){
     if("error" in result)return NextResponse.json(result,{status:result.status});
     await writeAuditLog({userId:user.id,action:"TICKET_CHECKED_IN",entity:"Booking",entityId:result.bookingCode,metadata:{guestCount:result.guestCount}});
     return NextResponse.json(result);
-  }catch(e){\n    if(e instanceof Error && (e.message.includes("Unique constraint") || e.message.includes("P2002"))) return NextResponse.json({error:"Ticket was checked in by another scanner. Refresh to view the check-in."},{status:409});\n    return NextResponse.json({error:e instanceof Error?e.message:"Unable to check in ticket"},{status:400});\n  }
+  }catch(e){
+    if(e instanceof Error && (e.message.includes("Unique constraint") || e.message.includes("P2002"))) return NextResponse.json({error:"Ticket was checked in by another scanner. Refresh to view the check-in."},{status:409});
+    return NextResponse.json({error:e instanceof Error?e.message:"Unable to check in ticket"},{status:400});
+  }
 }
