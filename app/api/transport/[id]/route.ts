@@ -47,8 +47,8 @@ export async function PATCH(req:Request,{params}:{params:Promise<{id:string}>}){
       throw new Error("Booking is not active for transport");
     }
     const result=await tx.transportBooking.updateMany({where:{id,status:ride.status as never},data:{status:next as never}});\n    if (result.count !== 1) throw new Error("Transport status changed concurrently. Please refresh and retry.");\n    const updated = await tx.transportBooking.findUniqueOrThrow({where:{id}});
-    if((next==="COMPLETED"||next==="CANCELLED")&&ride.driverId)await tx.driver.update({where:{id:ride.driverId},data:{available:true}});
-    else if(ride.driverId&&next==="DRIVER_CONFIRMED")await tx.driver.update({where:{id:ride.driverId},data:{available:false}});
+    if((next==="COMPLETED"||next==="CANCELLED")&&current.driverId)await tx.driver.update({where:{id:current.driverId},data:{available:true}});
+    else if(current.driverId&&next==="DRIVER_CONFIRMED")await tx.driver.update({where:{id:current.driverId},data:{available:false}});
     return updated;
     }, { isolationLevel: "Serializable", maxWait: 5000, timeout: 10000 });
   } catch (error) {
