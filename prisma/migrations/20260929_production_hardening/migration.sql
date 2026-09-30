@@ -56,3 +56,6 @@ CREATE UNIQUE INDEX "Payment_refundReceipt_key" ON "Payment"("refundReceipt");
 
 ALTER TABLE "NotificationLog" ADD COLUMN "lockedAt" TIMESTAMP(3);
 CREATE INDEX "NotificationLog_lockedAt_idx" ON "NotificationLog"("lockedAt");
+
+ALTER TABLE "Booking" ADD COLUMN "idempotencyKey" TEXT;
+CREATE UNIQUE INDEX "Booking_idempotencyKey_key" ON "Booking"("idempotencyKey");
