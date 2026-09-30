@@ -61,11 +61,17 @@ export async function PATCH(req: Request) {
         data: { role: role as never },
         select: { id: true, name: true, email: true, phone: true, role: true, createdAt: true },
       });
-    });
+    }, { isolationLevel: "Serializable" });
 
     await writeAuditLog({ userId: u.id, action: "ROLE_CHANGED", entity: "User", entityId: id, metadata: { from: target.role, to: role } });
     return NextResponse.json(updated);
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.message === "LAST_SUPER_ADMIN") {
+      return NextResponse.json({ error: "At least one super admin must remain" }, { status: 409 });
+    }
+    if (error && typeof error === "object" && "code" in error && (error as { code?: string }).code === "P2034") {
+      return NextResponse.json({ error: "Role change conflicted with another admin update. Please retry." }, { status: 409 });
+    }
     return NextResponse.json({ error: "Unable to update user role" }, { status: 400 });
   }
 }
