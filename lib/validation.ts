@@ -34,3 +34,9 @@ export const profileUpdateSchema = z.object({
   name: z.string().trim().min(2).max(120),
   phone: z.string().trim().max(30).nullable().optional(),
 });
+
+
+export const transportCreateSchema = z.object({
+  bookingId: z.string().min(1).max(100),
+  driverId: z.string().min(1).max(100).nullable().optional(),
+});
