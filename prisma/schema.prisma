@@ -38,7 +38,7 @@ model NotificationLog {
   sentAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  @@index([status, nextAttemptAt])
+  @@index([status, nextAttemptAt])\n  @@index([lockedAt])
   @@index([userId, createdAt])
 }
 model AuditLog { id String @id @default(cuid()) userId String? action String entity String entityId String? metadata Json? createdAt DateTime @default(now()) }
