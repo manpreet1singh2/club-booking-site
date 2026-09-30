@@ -81,6 +81,7 @@ export async function POST(req: Request) {
       completed: remaining === 0,
     });
   } catch (e) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : "Refund failed" }, { status: 400 });
+    console.error("Refund processing failed", e);
+    return NextResponse.json({ error: "Refund processing failed. Please retry or reconcile the payment." }, { status: 502 });
   }
 }
