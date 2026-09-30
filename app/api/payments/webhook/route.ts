@@ -40,7 +40,7 @@ export async function POST(req: Request) {
           if (current.gatewayPaymentId && current.gatewayPaymentId !== String(entity.id)) {
             throw new Error("Payment is already linked to a different gateway payment");
           }
-          await tx.payment.update({ where: { id: current.id }, data: { status: "PAID", gatewayPaymentId: String(entity.id), webhookEventId: eventId || null, gateway: "razorpay" } });
+          const claimed = await tx.payment.updateMany({ where: { id: current.id, status: { in: ["PENDING", "FAILED", "PARTIAL"] }, gatewayPaymentId: current.gatewayPaymentId || null }, data: { status: "PAID", gatewayPaymentId: String(entity.id), webhookEventId: eventId || null, gateway: "razorpay" } });\n          if (claimed.count !== 1) return;
           const aggregate = await tx.payment.aggregate({ where: { bookingId: current.bookingId, status: "PAID" }, _sum: { amount: true } });
           const paid = Number(aggregate._sum.amount || 0);
           const booking = await tx.booking.findUnique({ where: { id: current.bookingId } });
