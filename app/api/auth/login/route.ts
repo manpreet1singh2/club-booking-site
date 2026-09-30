@@ -23,11 +23,16 @@ export async function POST(req: Request) {
     const now = new Date();
     const attempt = await prisma.loginAttempt.findUnique({ where: { keyHash } });
     if (attempt?.blockedUntil && attempt.blockedUntil > now) return NextResponse.json({ error: "Too many login attempts. Please try again later." }, { status: 429 });
-    if (attempt && now.getTime() - attempt.windowStartedAt.getTime() >= WINDOW_MS) await prisma.loginAttempt.update({ where: { id: attempt.id }, data: { attempts: 0, windowStartedAt: now, blockedUntil: null } });
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user || !verifyPassword(password, user.passwordHash)) {
       const current = await prisma.loginAttempt.upsert({ where: { keyHash }, create: { keyHash, attempts: 1, windowStartedAt: now }, update: { attempts: { increment: 1 } } });
-      if (current.attempts >= MAX_ATTEMPTS) await prisma.loginAttempt.update({ where: { id: current.id }, data: { blockedUntil: new Date(Date.now() + BLOCK_MS) } });
+      const windowExpired = now.getTime() - current.windowStartedAt.getTime() >= WINDOW_MS;
+      if (windowExpired) {
+        const reset = await prisma.loginAttempt.updateMany({ where: { id: current.id, windowStartedAt: current.windowStartedAt }, data: { attempts: 1, windowStartedAt: now, blockedUntil: null } });
+        if (reset.count === 0) return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+      } else if (current.attempts >= MAX_ATTEMPTS) {
+        await prisma.loginAttempt.updateMany({ where: { id: current.id, attempts: { gte: MAX_ATTEMPTS }, blockedUntil: null }, data: { blockedUntil: new Date(Date.now() + BLOCK_MS) } });
+      }
       return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
     }
 
