@@ -71,10 +71,14 @@ export async function POST(req:NextRequest){
           const claimed=await tx.driver.updateMany({where:{id:selectedDriverId,available:true},data:{available:false}});
           if(claimed.count!==1)return {error:"Selected driver was just assigned to another ride",status:409};
 
-          if(existing?.driverId)await tx.driver.update({where:{id:existing.driverId},data:{available:true}});
+          if(existing?.driverId){
+            const released=await tx.driver.updateMany({where:{id:existing.driverId},data:{available:true}});
+            if(released.count!==1)return {error:"Previous driver assignment could not be released. Please retry.",status:409};
+          }
         }
       }else if(existing?.driverId){
-        await tx.driver.update({where:{id:existing.driverId},data:{available:true}});
+        const released=await tx.driver.updateMany({where:{id:existing.driverId},data:{available:true}});
+        if(released.count!==1)return {error:"Previous driver assignment could not be released. Please retry.",status:409};
       }
 
       const saved=await tx.transportBooking.upsert({
