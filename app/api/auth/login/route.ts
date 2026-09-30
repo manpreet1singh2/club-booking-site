@@ -6,7 +6,11 @@ import crypto from "crypto";
 const WINDOW_MS = 15 * 60_000;
 const MAX_ATTEMPTS = 5;
 const BLOCK_MS = 15 * 60_000;
-function throttleKey(email: string, req: Request) { return crypto.createHash("sha256").update(email + "|" + (req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown")).digest("hex"); }
+function throttleKey(email: string, req: Request) {
+  const forwarded = process.env.TRUST_PROXY === "true" ? req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() : "";
+  const client = forwarded || req.headers.get("x-real-ip")?.trim() || "unknown";
+  return crypto.createHash("sha256").update(email + "|" + client).digest("hex");
+}
 
 export async function POST(req: Request) {
   try {
