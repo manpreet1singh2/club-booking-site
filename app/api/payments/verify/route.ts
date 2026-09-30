@@ -29,6 +29,8 @@ export async function POST(req: Request) {
     }
 
     const result = await prisma.$transaction(async tx => {
+      const bookingState = await tx.booking.findUnique({ where: { id: payment.bookingId } });
+      if (!bookingState || bookingState.status !== "PENDING_PAYMENT" || bookingState.expiresAt <= new Date()) throw new Error("BOOKING_PAYMENT_HOLD_EXPIRED");
       const claimed = await tx.payment.updateMany({ where: { id: payment.id, status: { in: ["PENDING", "FAILED", "PARTIAL"] }, gatewayPaymentId: null }, data: { status: "PAID", gatewayPaymentId: paymentId, gatewaySignature: signature } });
       if (claimed.count !== 1) {
         const current = await tx.payment.findUnique({ where: { id: payment.id } });
@@ -49,6 +51,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, booking: result.updatedBooking });
   } catch (error) {
     if (error instanceof Error && error.message === "PAYMENT_STATE_CONFLICT") return NextResponse.json({ error: "Payment was already processed or changed. Refresh the booking." }, { status: 409 });
+    if (error instanceof Error && error.message === "BOOKING_PAYMENT_HOLD_EXPIRED") return NextResponse.json({ error: "Booking payment hold has expired. The payment will require reconciliation before the booking can be confirmed." }, { status: 409 });
     if (typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "P2034") return NextResponse.json({ error: "Payment verification conflicted with another transaction. Please retry." }, { status: 409 });
     return NextResponse.json({ error: "Payment verification failed" }, { status: 400 });
   }
