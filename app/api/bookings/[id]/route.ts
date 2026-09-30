@@ -67,36 +67,38 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     REFUND_PENDING: ["REFUNDED"],
     REFUNDED: [],
   };
-  if (!allowedTransitions[booking.status]?.includes(requestedStatus)) {
+  const effectiveStatus: Status = requestedStatus === "CANCELLED" && ["PAID", "PARTIAL"].includes(booking.paymentStatus) ? "REFUND_PENDING" : requestedStatus as Status;
+
+  if (!allowedTransitions[booking.status]?.includes(effectiveStatus)) {
     return NextResponse.json({ error: `Invalid booking status transition from ${booking.status} to ${requestedStatus}` }, { status: 409 });
   }
 
   if (user.role === "CUSTOMER" && booking.status === "COMPLETED") return NextResponse.json({ error: "Completed bookings cannot be cancelled" }, { status: 400 });
   if (user.role === "CUSTOMER" && body.status === "CANCELLED" && ["CANCELLED","REFUNDED"].includes(booking.status)) return NextResponse.json({ error: "Booking is already closed" }, { status: 400 });
   if (body.status === "CONFIRMED" && !["PAID","PARTIAL"].includes(booking.paymentStatus)) return NextResponse.json({ error: "Payment must be verified before confirmation" }, { status: 400 });
-  if (body.status === "REFUND_PENDING" && !["PAID","PARTIAL"].includes(booking.paymentStatus)) return NextResponse.json({ error: "A paid booking is required before refund processing" }, { status: 400 });
-  if (requestedStatus === "CANCELLED" && ["PAID","PARTIAL"].includes(booking.paymentStatus) && booking.status !== "REFUND_PENDING") body.status = "REFUND_PENDING";
-  if (body.status === "REFUNDED" && booking.status !== "REFUND_PENDING") return NextResponse.json({ error: "Booking must be refund-pending first" }, { status: 400 });
-  if (user.role === "CLUB_OWNER" && body.status === "REFUNDED") return NextResponse.json({ error: "Only super admins can process refunds" }, { status: 403 });
+  if (effectiveStatus === "REFUND_PENDING" && !["PAID","PARTIAL"].includes(booking.paymentStatus)) return NextResponse.json({ error: "A paid booking is required before refund processing" }, { status: 400 });
+
+  if (effectiveStatus === "REFUNDED" && booking.status !== "REFUND_PENDING") return NextResponse.json({ error: "Booking must be refund-pending first" }, { status: 400 });
+  if (user.role === "CLUB_OWNER" && effectiveStatus === "REFUNDED") return NextResponse.json({ error: "Only super admins can process refunds" }, { status: 403 });
   let updated;
   try {
     updated = await prisma.$transaction(async tx => {
       const result = await tx.booking.updateMany({
         where: { id, status: booking.status },
-        data: { status: requestedStatus as Status },
+        data: { status: effectiveStatus },
       });
       if (result.count !== 1) throw new Error("BOOKING_STATE_CONFLICT");
 
-      if (requestedStatus === "REFUND_PENDING") {
+      if (effectiveStatus === "REFUND_PENDING") {
         await tx.booking.update({ where: { id }, data: { paymentStatus: "PARTIAL" } });
       }
-      if (body.status === "CANCELLED" && booking.transport?.driverId) {
+      if (effectiveStatus === "CANCELLED" && booking.transport?.driverId) {
         await tx.driver.update({ where: { id: booking.transport.driverId }, data: { available: true } });
       }
-      if (body.status === "CANCELLED" && booking.transport) {
+      if (effectiveStatus === "CANCELLED" && booking.transport) {
         await tx.transportBooking.update({ where: { bookingId: id }, data: { status: "CANCELLED" } });
       }
-      if (requestedStatus === "REFUNDED") {
+      if (effectiveStatus === "REFUNDED") {
         await tx.booking.update({ where: { id }, data: { paymentStatus: "REFUNDED" } });
       }
       return tx.booking.findUniqueOrThrow({ where: { id } });
@@ -107,6 +109,6 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     }
     throw error;
   }
-  await writeAuditLog({ userId: user.id, action: body.status ? "BOOKING_STATUS_CHANGED" : "BOOKING_UPDATED", entity: "Booking", entityId: id, metadata: body.status ? { from: booking.status, to: requestedStatus } : undefined });
+  await writeAuditLog({ userId: user.id, action: body.status ? "BOOKING_STATUS_CHANGED" : "BOOKING_UPDATED", entity: "Booking", entityId: id, metadata: body.status ? { from: booking.status, to: effectiveStatus } : undefined });
   return NextResponse.json(updated);
 }
