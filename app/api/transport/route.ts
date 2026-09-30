@@ -48,6 +48,19 @@ export async function POST(req:NextRequest){
         if(!driver||driver.vehicleType!==booking.transportType)return {error:"Selected driver is invalid for this transport type",status:400};
         if(existing?.driverId!==selectedDriverId&&!driver.available)return {error:"Selected driver is unavailable",status:409};
 
+        const pickupWindowStart=new Date(booking.pickupTime.getTime()-2*60*60*1000);
+        const pickupWindowEnd=new Date(booking.pickupTime.getTime()+2*60*60*1000);
+        const conflictingRide=await tx.transportBooking.findFirst({
+          where:{
+            driverId:selectedDriverId,
+            id:existing?.id?{not:existing.id}:undefined,
+            status:{in:["PENDING","ASSIGNED","DRIVER_CONFIRMED","ON_THE_WAY","ARRIVED","PICKED_UP"]},
+            pickupTime:{gte:pickupWindowStart,lte:pickupWindowEnd},
+          },
+          select:{id:true,pickupTime:true,booking:{select:{bookingCode:true}}},
+        });
+        if(conflictingRide)return {error:"Driver already has an overlapping ride around this pickup time",status:409};
+
         if(existing?.driverId!==selectedDriverId){
           const claimed=await tx.driver.updateMany({where:{id:selectedDriverId,available:true},data:{available:false}});
           if(claimed.count!==1)return {error:"Selected driver was just assigned to another ride",status:409};
