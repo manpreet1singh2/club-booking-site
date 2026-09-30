@@ -48,18 +48,20 @@ export async function POST(req: Request) {
           if (current.gatewayPaymentId && current.gatewayPaymentId !== String(entity.id)) {
             throw new Error("Payment is already linked to a different gateway payment");
           }
+          const booking = await tx.booking.findUnique({ where: { id: current.bookingId } });
+          if (!booking) return;
+          if (booking.status !== "PENDING_PAYMENT" || booking.expiresAt <= new Date()) throw new Error("BOOKING_PAYMENT_HOLD_EXPIRED");
           const claimed = await tx.payment.updateMany({ where: { id: current.id, status: { in: ["PENDING", "FAILED", "PARTIAL"] }, gatewayPaymentId: current.gatewayPaymentId || null }, data: { status: "PAID", gatewayPaymentId: String(entity.id), webhookEventId: eventId || null, gateway: "razorpay" } });
           if (claimed.count !== 1) return;
           const aggregate = await tx.payment.aggregate({ where: { bookingId: current.bookingId, status: "PAID" }, _sum: { amount: true } });
           const paid = Number(aggregate._sum.amount || 0);
-          const booking = await tx.booking.findUnique({ where: { id: current.bookingId } });
-          if (!booking) return;
           confirmed = paid >= Number(booking.advanceAmount);
           await tx.booking.update({ where: { id: booking.id }, data: { paymentStatus: paid >= Number(booking.totalAmount) ? "PAID" : "PARTIAL", status: confirmed ? "CONFIRMED" : "PENDING_PAYMENT" } });
         });
       } catch (error) {
         if (eventId && error instanceof Error && error.message.toLowerCase().includes("unique")) return NextResponse.json({ received: true, duplicate: true });
         if (prismaCode(error) === "P2034") return NextResponse.json({ received: true, retry: true }, { status: 409 });
+        if (error instanceof Error && error.message === "BOOKING_PAYMENT_HOLD_EXPIRED") return NextResponse.json({ received: true, retry: false, reconciliationRequired: true }, { status: 409 });
         throw error;
       }
       if (eventId) await prisma.paymentWebhookEvent.update({ where: { eventId }, data: { status: "PROCESSED", processedAt: new Date(), error: null } });
