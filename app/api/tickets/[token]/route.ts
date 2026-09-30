@@ -4,6 +4,9 @@ import { getCurrentUser } from "@/lib/auth";
 
 export async function GET(_: Request, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
+  if (!token || token.length > 200 || !/^[A-Za-z0-9_-]+$/.test(token)) {
+    return NextResponse.json({ valid: false, error: "Invalid ticket token" }, { status: 400 });
+  }
   const viewer = await getCurrentUser();
   const booking = await prisma.booking.findUnique({
     where: { ticketToken: token },
