@@ -24,6 +24,15 @@ export async function POST(req: Request) {
     for (const payment of captured) {
       const receipt = "refund:" + payment.id;
       if (payment.refundId) continue;
+      const claim = await prisma.payment.updateMany({
+        where: { id: payment.id, status: "PAID", refundId: null, refundStartedAt: null },
+        data: { refundStartedAt: new Date() },
+      });
+      if (claim.count !== 1) {
+        const current = await prisma.payment.findUnique({ where: { id: payment.id } });
+        if (current?.refundId) continue;
+        return NextResponse.json({ error: "Refund is already being processed for this payment" }, { status: 409 });
+      }
 
       const amount = Number(payment.amount);
       if (amount <= 0) continue;
@@ -42,7 +51,7 @@ export async function POST(req: Request) {
 
       const saved = await prisma.payment.updateMany({
         where: { id: payment.id, status: "PAID", refundId: null },
-        data: { refundId: refund.id, refundReceipt: receipt, refundedAmount: amount, status: "REFUNDED" },
+        data: { refundId: refund.id, refundReceipt: receipt, refundedAmount: amount, refundStartedAt: null, status: "REFUNDED" },
       });
 
       if (saved.count === 1) {
