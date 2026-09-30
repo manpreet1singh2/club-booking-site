@@ -5,6 +5,12 @@ import { notifyTransportStatus } from "@/lib/notifications";
 import { writeAuditLog } from "@/lib/audit";
 import { transportStatusSchema } from "@/lib/validation";
 
+function prismaCode(error: unknown) {
+  return typeof error === "object" && error !== null && "code" in error
+    ? (error as { code?: string }).code
+    : undefined;
+}
+
 const transitions: Record<string,string[]> = {
   ASSIGNED:["DRIVER_CONFIRMED","CANCELLED"],
   DRIVER_CONFIRMED:["ON_THE_WAY","CANCELLED"],
@@ -32,7 +38,9 @@ export async function PATCH(req:Request,{params}:{params:Promise<{id:string}>}){
   if(user.role==="DRIVER"&&next==="CANCELLED")return NextResponse.json({error:"Drivers cannot cancel assigned rides"},{status:403});
   if(!Object.prototype.hasOwnProperty.call(transitions,ride.status)||!transitions[ride.status].includes(next))return NextResponse.json({error:"Invalid transport status transition"},{status:400});
 
-  const updated=await prisma.$transaction(async tx=>{
+  let updated;
+  try {
+    updated=await prisma.$transaction(async tx=>{
     const current=await tx.transportBooking.findUnique({where:{id},include:{booking:true}});
     if(!current)return null;
     if(!["CONFIRMED","COMPLETED"].includes(current.booking.status)||!["PAID","PARTIAL"].includes(current.booking.paymentStatus)){
@@ -42,7 +50,16 @@ export async function PATCH(req:Request,{params}:{params:Promise<{id:string}>}){
     if((next==="COMPLETED"||next==="CANCELLED")&&ride.driverId)await tx.driver.update({where:{id:ride.driverId},data:{available:true}});
     else if(ride.driverId&&next==="DRIVER_CONFIRMED")await tx.driver.update({where:{id:ride.driverId},data:{available:false}});
     return updated;
-  });
+    }, { isolationLevel: "Serializable", maxWait: 5000, timeout: 10000 });
+  } catch (error) {
+    if (error instanceof Error && error.message === "Transport status changed concurrently. Please refresh and retry.") {
+      return NextResponse.json({error:error.message},{status:409});
+    }
+    if (prismaCode(error) === "P2034") {
+      return NextResponse.json({error:"Transport update conflicted with another transaction. Refresh and retry."},{status:409});
+    }
+    throw error;
+  }
   if(!updated)return NextResponse.json({error:"Transport booking not found"},{status:404});
   await writeAuditLog({ userId: user.id, action: "TRANSPORT_STATUS_CHANGED", entity: "TransportBooking", entityId: updated.id, metadata: { from: ride.status, to: next, bookingId: ride.bookingId, driverId: ride.driverId } });
   notifyTransportStatus(updated.id).catch(()=>undefined);
