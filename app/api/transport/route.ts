@@ -2,6 +2,7 @@ import {NextRequest,NextResponse} from "next/server";
 import {getCurrentUser} from "@/lib/auth";
 import {prisma} from "@/lib/prisma";
 import {notifyTransportAssigned} from "@/lib/notifications";
+import {transportCreateSchema} from "@/lib/validation";
 
 export async function GET(req:NextRequest){
   const user=await getCurrentUser();
@@ -22,10 +23,9 @@ export async function POST(req:NextRequest){
   if(!user)return NextResponse.json({error:"Authentication required"},{status:401});
   if(user.role!=="SUPER_ADMIN"&&user.role!=="CLUB_OWNER")return NextResponse.json({error:"Forbidden"},{status:403});
   try{
-    const body=await req.json();
-    const bookingId=String(body.bookingId||"");
-    const requestedDriverId=body.driverId?String(body.driverId):null;
-    if(!bookingId)return NextResponse.json({error:"bookingId is required"},{status:400});
+    const body=transportCreateSchema.parse(await req.json());
+    const bookingId=body.bookingId;
+    const requestedDriverId=body.driverId || null;
 
     const transport=await prisma.$transaction(async tx=>{
       const booking=await tx.booking.findUnique({where:{id:bookingId},include:{club:{select:{ownerId:true}}}});
