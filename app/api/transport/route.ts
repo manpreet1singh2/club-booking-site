@@ -4,6 +4,12 @@ import {prisma} from "@/lib/prisma";
 import {notifyTransportAssigned} from "@/lib/notifications";
 import {transportCreateSchema} from "@/lib/validation";
 
+function prismaCode(error: unknown) {
+  return typeof error === "object" && error !== null && "code" in error
+    ? (error as { code?: string }).code
+    : undefined;
+}
+
 export async function GET(req:NextRequest){
   const user=await getCurrentUser();
   if(!user)return NextResponse.json({error:"Authentication required"},{status:401});
@@ -84,6 +90,7 @@ export async function POST(req:NextRequest){
     notifyTransportAssigned(transport.saved.id).catch(()=>undefined);
     return NextResponse.json(transport.saved,{status:201});
   }catch(error){
+    if(prismaCode(error)==="P2034")return NextResponse.json({error:"Transport assignment conflicted with another update. Please retry."},{status:409});
     return NextResponse.json({error:error instanceof Error?error.message:"Unable to assign transport"},{status:400});
   }
 }
