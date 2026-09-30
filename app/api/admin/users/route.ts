@@ -49,6 +49,10 @@ export async function PATCH(req: Request) {
     }
 
     const updated = await prisma.$transaction(async tx => {
+      if (target.role === "SUPER_ADMIN" && role !== "SUPER_ADMIN") {
+        const superAdmins = await tx.user.count({ where: { role: "SUPER_ADMIN" } });
+        if (superAdmins <= 1) throw new Error("LAST_SUPER_ADMIN");
+      }
       if (target.role === "DRIVER" && role !== "DRIVER") {
         await tx.driver.delete({ where: { userId: id } });
       }
