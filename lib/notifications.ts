@@ -13,7 +13,13 @@ function normalizePhone(value: string) {
   return digits.length === 10 ? "91" + digits : digits;
 }
 
-export async function retryNotification(notificationId: string) {\n  const log = await prisma.notificationLog.findUnique({ where: { id: notificationId } });\n  if (!log || log.channel !== "WHATSAPP" || !["RETRY_PENDING", "PENDING", "PROCESSING"].includes(log.status)) return { sent: false, skipped: true };\n  return sendWhatsApp({ to: log.recipient, template: log.template, parameters: Array.isArray(log.parameters) ? log.parameters.map(String) : undefined, userId: log.userId, idempotencyKey: log.idempotencyKey });\n}\n\nasync function sendWhatsApp(message: TemplateMessage) {
+export async function retryNotification(notificationId: string) {
+  const log = await prisma.notificationLog.findUnique({ where: { id: notificationId } });
+  if (!log || log.channel !== "WHATSAPP" || !["RETRY_PENDING", "PENDING", "PROCESSING"].includes(log.status)) return { sent: false, skipped: true };
+  return sendWhatsApp({ to: log.recipient, template: log.template, parameters: Array.isArray(log.parameters) ? log.parameters.map(String) : undefined, userId: log.userId, idempotencyKey: log.idempotencyKey });
+}
+
+async function sendWhatsApp(message: TemplateMessage) {
   const existing = await prisma.notificationLog.findUnique({ where: { idempotencyKey: message.idempotencyKey } });
   if (existing?.status === "SENT") return { sent: true, duplicate: true };
 
@@ -23,11 +29,15 @@ export async function retryNotification(notificationId: string) {\n  const log =
       userId: message.userId || null,
       channel: "WHATSAPP",
       template: message.template,
+      recipient: normalizePhone(message.to),
+      parameters: message.parameters ?? [],
       status: "PENDING",
       attempt: 1,
       maxAttempts: 3,
     },
   });
+
+  if (existing && existing.status !== "PENDING" && existing.status !== "RETRY_PENDING" && existing.status !== "PROCESSING") return { sent: false, skipped: true };
 
   const token = process.env.WHATSAPP_ACCESS_TOKEN;
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
@@ -67,7 +77,8 @@ export async function retryNotification(notificationId: string) {\n  const log =
         providerMessageId: data?.messages?.[0]?.id || null,
         sentAt: new Date(),
         lastError: null,
-        nextAttemptAt: null,\n        lockedAt: null,
+        nextAttemptAt: null,
+        lockedAt: null,
       },
     });
     return { sent: true, data };
@@ -81,7 +92,8 @@ export async function retryNotification(notificationId: string) {\n  const log =
       status: retryable ? "RETRY_PENDING" : "FAILED",
       attempt: attempt + 1,
       lastError: String(data?.error?.message || "WhatsApp request failed").slice(0, 500),
-      nextAttemptAt: retryable ? new Date(Date.now() + Math.min(60 * 60 * 1000, 2 ** attempt * 60 * 1000)) : null,\n      lockedAt: null,
+      nextAttemptAt: retryable ? new Date(Date.now() + Math.min(60 * 60 * 1000, 2 ** attempt * 60 * 1000)) : null,
+      lockedAt: null,
     },
   });
   return { sent: false, data };
