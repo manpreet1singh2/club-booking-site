@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { cleanupExpiredSessions } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
 export async function POST(req: Request) {
   const secret = process.env.INTERNAL_JOB_SECRET;
@@ -8,5 +9,9 @@ export async function POST(req: Request) {
   }
 
   const deleted = await cleanupExpiredSessions(500);
-  return NextResponse.json({ deleted });
+  const expired = await prisma.booking.updateMany({
+    where: { status: "PENDING_PAYMENT", paymentStatus: "PENDING", expiresAt: { lte: new Date() } },
+    data: { status: "EXPIRED" },
+  });
+  return NextResponse.json({ deleted, expiredBookings: expired.count });
 }
