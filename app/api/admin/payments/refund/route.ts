@@ -50,7 +50,7 @@ export async function POST(req: Request) {
       }
 
       const saved = await prisma.payment.updateMany({
-        where: { id: payment.id, status: "PAID", refundId: null },
+        where: { id: payment.id, status: "PAID", refundId: null, refundStartedAt: { not: null } },
         data: { refundId: refund.id, refundReceipt: receipt, refundedAmount: amount, refundStartedAt: null, status: "REFUNDED" },
       });
 
