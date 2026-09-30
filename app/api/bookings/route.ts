@@ -5,6 +5,9 @@ import { bookingSchema } from "@/lib/validation";
 import { calculateBookingAmounts, createBookingCode } from "@/lib/booking";
 import { notifyBookingCreated } from "@/lib/notifications";
 
+const bookingStatuses = ["PENDING_PAYMENT","CONFIRMED","CANCELLED","COMPLETED","EXPIRED","REFUND_PENDING","REFUNDED"] as const;
+const paymentStatuses = ["PENDING","PAID","FAILED","REFUNDED","PARTIAL"] as const;
+
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
@@ -16,12 +19,19 @@ export async function GET(req: NextRequest) {
   const paymentStatus = searchParams.get("paymentStatus");
   const q = searchParams.get("q");
 
+  if (status && !bookingStatuses.includes(status as typeof bookingStatuses[number])) {
+    return NextResponse.json({ error: "Invalid booking status filter" }, { status: 400 });
+  }
+  if (paymentStatus && !paymentStatuses.includes(paymentStatus as typeof paymentStatuses[number])) {
+    return NextResponse.json({ error: "Invalid payment status filter" }, { status: 400 });
+  }
+
   const isPrivileged = user.role === "SUPER_ADMIN" || user.role === "CLUB_OWNER";
   if (requestedUserId && requestedUserId !== user.id && !isPrivileged) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const where: any = {
+  const where: Record<string, unknown> = {
     ...(isPrivileged && requestedUserId ? { userId: requestedUserId } : !isPrivileged ? { userId: user.id } : {}),
     ...(clubId ? { clubId } : {}),
     ...(status ? { status } : {}),
