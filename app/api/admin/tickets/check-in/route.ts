@@ -1,6 +1,7 @@
 import {NextResponse} from "next/server";
 import {getCurrentUser} from "@/lib/auth";
 import {prisma} from "@/lib/prisma";
+import {writeAuditLog} from "@/lib/audit";
 
 function sameLocalDate(a:Date,b:Date){
   return a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate();
@@ -23,6 +24,7 @@ export async function POST(req:Request){
       return {ok:true,bookingCode:booking.bookingCode,guestCount:booking.guestCount,club:booking.club.name,event:booking.event?.name||booking.package.name,checkedInAt:checkIn.checkedInAt};
     },{isolationLevel:"Serializable",maxWait:5000,timeout:10000});
     if("error" in result)return NextResponse.json(result,{status:result.status});
+    await writeAuditLog({userId:user.id,action:"TICKET_CHECKED_IN",entity:"Booking",entityId:result.bookingCode,metadata:{guestCount:result.guestCount}});
     return NextResponse.json(result);
-  }catch(e){return NextResponse.json({error:e instanceof Error?e.message:"Unable to check in ticket"},{status:400});}
+  }catch(e){\n    if(e instanceof Error && (e.message.includes("Unique constraint") || e.message.includes("P2002"))) return NextResponse.json({error:"Ticket was checked in by another scanner. Refresh to view the check-in."},{status:409});\n    return NextResponse.json({error:e instanceof Error?e.message:"Unable to check in ticket"},{status:400});\n  }
 }
