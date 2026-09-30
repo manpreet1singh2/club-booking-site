@@ -41,6 +41,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const { id } = await params;
   const body = await req.json();
+  const requestedStatus = body.status as Status | undefined;
   const booking = await prisma.booking.findUnique({ where: { id }, include: { transport: true, club: { select: { ownerId: true } } } });
   if (!booking) return NextResponse.json({ error: "Booking not found" }, { status: 404 });
 
@@ -77,14 +78,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (requestedStatus === "CANCELLED" && ["PAID","PARTIAL"].includes(booking.paymentStatus) && booking.status !== "REFUND_PENDING") body.status = "REFUND_PENDING";
   if (body.status === "REFUNDED" && booking.status !== "REFUND_PENDING") return NextResponse.json({ error: "Booking must be refund-pending first" }, { status: 400 });
   if (user.role === "CLUB_OWNER" && body.status === "REFUNDED") return NextResponse.json({ error: "Only super admins can process refunds" }, { status: 403 });
-  const updated = await prisma.$transaction(async tx => {
-    const result = await tx.booking.update({ where: { id }, data: { status: requestedStatus as Status } });
-    if (requestedStatus === "REFUND_PENDING") await tx.booking.update({ where: { id }, data: { paymentStatus: "PARTIAL" } });
-    if (body.status === "CANCELLED" && booking.transport?.driverId) await tx.driver.update({ where: { id: booking.transport.driverId }, data: { available: true } });
-    if (body.status === "CANCELLED" && booking.transport) await tx.transportBooking.update({ where: { bookingId: id }, data: { status: "CANCELLED" } });
-    if (requestedStatus === "REFUNDED") await tx.booking.update({ where: { id }, data: { paymentStatus: "REFUNDED" } });
-    return result;
-  });
+  let updated;
+  try {
+    updated = await prisma.$transaction(async tx => {
+
+  }, { isolationLevel: "Serializable", maxWait: 5000, timeout: 10000 });
+  } catch (error) {
+    if (error instanceof Error && error.message === "BOOKING_STATE_CONFLICT") return NextResponse.json({ error: "Booking was changed by another request. Refresh and retry." }, { status: 409 });
+    throw error;
+  }
   await writeAuditLog({ userId: user.id, action: body.status ? "BOOKING_STATUS_CHANGED" : "BOOKING_UPDATED", entity: "Booking", entityId: id, metadata: body.status ? { from: booking.status, to: requestedStatus } : undefined });
   return NextResponse.json(updated);
 }
