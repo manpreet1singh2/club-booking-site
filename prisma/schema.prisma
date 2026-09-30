@@ -16,7 +16,9 @@ model Event { id String @id @default(cuid()) clubId String club Club @relation(f
 model Package { id String @id @default(cuid()) clubId String club Club @relation(fields:[clubId],references:[id]) name String description String? price Decimal @db.Decimal(10,2) pricing PackagePricing @default(PER_PERSON) active Boolean @default(true) bookings Booking[] createdAt DateTime @default(now()) }
 model Booking { id String @id @default(cuid()) bookingCode String @unique
   idempotencyKey String? @unique userId String user User @relation(fields:[userId],references:[id]) clubId String club Club @relation(fields:[clubId],references:[id]) eventId String? event Event? @relation(fields:[eventId],references:[id]) packageId String package Package @relation(fields:[packageId],references:[id]) guestCount Int transportType TransportType @default(NONE) visitDate DateTime pickupLocation String? pickupTime DateTime? totalAmount Decimal @db.Decimal(10,2) advanceAmount Decimal @db.Decimal(10,2) remainingAmount Decimal @db.Decimal(10,2) ticketToken String @unique @default(cuid()) status BookingStatus @default(PENDING_PAYMENT) paymentStatus PaymentStatus @default(PENDING) payments Payment[] transport TransportBooking? createdAt DateTime @default(now()) updatedAt DateTime @updatedAt }
-model TicketCheckIn { id String @id @default(cuid()) bookingId String @unique booking Booking @relation(fields:[bookingId],references:[id],onDelete:Cascade) checkedInAt DateTime @default(now()) checkedInById String checkedInBy User @relation(fields:[checkedInById],references:[id]) }\nmodel Payment { id String @id @default(cuid()) bookingId String booking Booking @relation(fields:[bookingId],references:[id]) gatewayOrderId String? @unique\n  orderCreationKey String? @unique gatewayPaymentId String? @unique gatewaySignature String? webhookEventId String? @unique refundId String? @unique refundReceipt String? @unique refundedAmount Decimal @db.Decimal(10,2) @default(0) amount Decimal @db.Decimal(10,2) status PaymentStatus @default(PENDING) gateway String? transactionId String? createdAt DateTime @default(now()) }
+model TicketCheckIn { id String @id @default(cuid()) bookingId String @unique booking Booking @relation(fields:[bookingId],references:[id],onDelete:Cascade) checkedInAt DateTime @default(now()) checkedInById String checkedInBy User @relation(fields:[checkedInById],references:[id]) }
+model Payment { id String @id @default(cuid()) bookingId String booking Booking @relation(fields:[bookingId],references:[id]) gatewayOrderId String? @unique
+  orderCreationKey String? @unique gatewayPaymentId String? @unique gatewaySignature String? webhookEventId String? @unique refundId String? @unique refundReceipt String? @unique refundedAmount Decimal @db.Decimal(10,2) @default(0) amount Decimal @db.Decimal(10,2) status PaymentStatus @default(PENDING) gateway String? transactionId String? createdAt DateTime @default(now()) }
 model PaymentWebhookEvent { id String @id @default(cuid()) provider String eventId String @unique event String status WebhookEventStatus @default(RECEIVED) payload Json? error String? receivedAt DateTime @default(now()) processedAt DateTime?
   @@index([status, receivedAt])
   @@index([event, receivedAt])
@@ -40,7 +42,8 @@ model NotificationLog {
   sentAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  @@index([status, nextAttemptAt])\n  @@index([lockedAt])
+  @@index([status, nextAttemptAt])
+  @@index([lockedAt])
   @@index([userId, createdAt])
 }
 model AuditLog { id String @id @default(cuid()) userId String? action String entity String entityId String? metadata Json? createdAt DateTime @default(now()) }
