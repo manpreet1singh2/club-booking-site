@@ -3,6 +3,12 @@ import { prisma } from "@/lib/prisma";
 import { verifyWebhookSignature } from "@/lib/razorpay";
 import { notifyBookingConfirmed } from "@/lib/notifications";
 
+function prismaCode(error: unknown) {
+  return typeof error === "object" && error !== null && "code" in error
+    ? (error as { code?: string }).code
+    : undefined;
+}
+
 export async function POST(req: Request) {
   const raw = await req.text();
   const signature = req.headers.get("x-razorpay-signature") || "";
@@ -52,6 +58,7 @@ export async function POST(req: Request) {
         });
       } catch (error) {
         if (eventId && error instanceof Error && error.message.toLowerCase().includes("unique")) return NextResponse.json({ received: true, duplicate: true });
+        if (prismaCode(error) === "P2034") return NextResponse.json({ received: true, retry: true }, { status: 409 });
         throw error;
       }
       if (eventId) await prisma.paymentWebhookEvent.update({ where: { eventId }, data: { status: "PROCESSED", processedAt: new Date(), error: null } });
