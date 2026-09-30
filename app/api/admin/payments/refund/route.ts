@@ -3,16 +3,20 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createRazorpayRefund } from "@/lib/razorpay";
 import { writeAuditLog } from "@/lib/audit";
+import { z } from "zod";
+
+const refundRequestSchema = z.object({ bookingId: z.string().trim().min(1).max(100) });
 
 export async function POST(req: Request) {
   const u = await getCurrentUser();
   if (!u || u.role !== "SUPER_ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   try {
-    const { bookingId } = await req.json();
-    if (!bookingId) return NextResponse.json({ error: "bookingId is required" }, { status: 400 });
+    const parsed = refundRequestSchema.safeParse(await req.json());
+    if (!parsed.success) return NextResponse.json({ error: "bookingId is required and must be valid" }, { status: 400 });
+    const { bookingId } = parsed.data;
 
-    const booking = await prisma.booking.findUnique({ where: { id: String(bookingId) }, include: { payments: true } });
+    const booking = await prisma.booking.findUnique({ where: { id: bookingId }, include: { payments: true } });
     if (!booking) return NextResponse.json({ error: "Booking not found" }, { status: 404 });
     if (booking.status !== "REFUND_PENDING" && booking.status !== "REFUNDED") {
       return NextResponse.json({ error: "Booking must be refund-pending or already refunded" }, { status: 400 });
