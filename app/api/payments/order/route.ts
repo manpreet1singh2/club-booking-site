@@ -12,9 +12,15 @@ export async function POST(req: Request) {
     const booking = await prisma.booking.findUnique({ where: { id: String(bookingId) } });
     if (!booking) return NextResponse.json({ error: "Booking not found" }, { status: 404 });
     if (booking.userId !== user.id && user.role !== "SUPER_ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    if (booking.status !== "PENDING_PAYMENT") return NextResponse.json({ error: "Booking is not awaiting payment" }, { status: 400 });\n    if (!["PENDING","PARTIAL"].includes(booking.paymentStatus)) return NextResponse.json({ error: "Booking payment state does not allow an advance order" }, { status: 400 });
+    if (booking.status !== "PENDING_PAYMENT") return NextResponse.json({ error: "Booking is not awaiting payment" }, { status: 400 });
+    if (booking.expiresAt <= new Date()) {
+      await prisma.booking.updateMany({ where: { id: booking.id, status: "PENDING_PAYMENT", paymentStatus: "PENDING", expiresAt: { lte: new Date() } }, data: { status: "EXPIRED" } });
+      return NextResponse.json({ error: "Booking payment hold has expired. Please create a new booking." }, { status: 409 });
+    }
+    if (!["PENDING","PARTIAL"].includes(booking.paymentStatus)) return NextResponse.json({ error: "Booking payment state does not allow an advance order" }, { status: 400 });
 
-    const existing = await prisma.payment.findUnique({ where: { orderCreationKey: "booking:" + booking.id + ":advance" } });\n    if (existing?.status === "PAID" || existing?.status === "REFUNDED") return NextResponse.json({ error: "Advance payment has already been processed" }, { status: 409 });
+    const existing = await prisma.payment.findUnique({ where: { orderCreationKey: "booking:" + booking.id + ":advance" } });
+    if (existing?.status === "PAID" || existing?.status === "REFUNDED") return NextResponse.json({ error: "Advance payment has already been processed" }, { status: 409 });
     if (existing?.gatewayOrderId && existing.status === "PENDING") return NextResponse.json({ orderId: existing.gatewayOrderId, amount: Number(booking.advanceAmount), currency: "INR", keyId: process.env.PAYMENT_KEY_ID });
     if (existing && existing.status === "PENDING") return NextResponse.json({ error: "Payment order is already being created. Please retry shortly." }, { status: 409 });
 
