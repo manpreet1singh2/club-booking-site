@@ -38,7 +38,7 @@ export async function createSession(userId: string) {
 
 export async function getCurrentUser() {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
-  if (!token || token.length !== 64) return null;
+  if (!token || token.length !== 64 || !/^[0-9a-f]+$/i.test(token)) return null;
 
   const session = await prisma.session.findUnique({
     where: { tokenHash: hashSessionToken(token) },
@@ -59,11 +59,11 @@ export async function revokeCurrentSession() {
   if (token) await prisma.session.deleteMany({ where: { tokenHash: hashSessionToken(token) } });
 }
 
-export async function cleanupExpiredSessions(limit = 500) {
+export async function cleanupExpiredSessions(limit = 500) {\n  const safeLimit = Math.max(1, Math.min(limit, 5000));
   const expired = await prisma.session.findMany({
     where: { expiresAt: { lte: new Date() } },
     select: { id: true },
-    take: limit,
+    take: safeLimit,
   });
   if (!expired.length) return 0;
   const result = await prisma.session.deleteMany({ where: { id: { in: expired.map(s => s.id) } } });
