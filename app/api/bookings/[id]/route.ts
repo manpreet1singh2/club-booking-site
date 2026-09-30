@@ -6,6 +6,12 @@ import { writeAuditLog } from "@/lib/audit";
 const statuses = ["CONFIRMED", "CANCELLED", "COMPLETED", "EXPIRED", "REFUND_PENDING", "REFUNDED"] as const;
 type Status = typeof statuses[number];
 
+function prismaCode(error: unknown) {
+  return typeof error === "object" && error !== null && "code" in error
+    ? (error as { code?: string }).code
+    : undefined;
+}
+
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
@@ -106,6 +112,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   } catch (error) {
     if (error instanceof Error && error.message === "BOOKING_STATE_CONFLICT") {
       return NextResponse.json({ error: "Booking was changed by another request. Refresh and retry." }, { status: 409 });
+    }
+    if (prismaCode(error) === "P2034") {
+      return NextResponse.json({ error: "Booking update conflicted with another transaction. Refresh and retry." }, { status: 409 });
     }
     throw error;
   }
