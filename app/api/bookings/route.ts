@@ -5,6 +5,8 @@ import { bookingSchema } from "@/lib/validation";
 import { calculateBookingAmounts, createBookingCode } from "@/lib/booking";
 import { notifyBookingCreated } from "@/lib/notifications";
 
+const PAYMENT_HOLD_MINUTES = 15;
+
 const bookingStatuses = ["PENDING_PAYMENT","CONFIRMED","CANCELLED","COMPLETED","EXPIRED","REFUND_PENDING","REFUNDED"] as const;
 const paymentStatuses = ["PENDING","PAID","FAILED","REFUNDED","PARTIAL"] as const;
 
@@ -134,6 +136,7 @@ export async function POST(req: NextRequest) {
               totalAmount: amounts.totalAmount,
               advanceAmount: amounts.advanceAmount,
               remainingAmount: amounts.remainingAmount,
+              expiresAt: new Date(Date.now() + PAYMENT_HOLD_MINUTES * 60_000),
             },
             include: { club: true, package: true, event: true },
           });
