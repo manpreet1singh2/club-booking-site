@@ -81,10 +81,30 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   let updated;
   try {
     updated = await prisma.$transaction(async tx => {
+      const result = await tx.booking.updateMany({
+        where: { id, status: booking.status },
+        data: { status: requestedStatus as Status },
+      });
+      if (result.count !== 1) throw new Error("BOOKING_STATE_CONFLICT");
 
-  }, { isolationLevel: "Serializable", maxWait: 5000, timeout: 10000 });
+      if (requestedStatus === "REFUND_PENDING") {
+        await tx.booking.update({ where: { id }, data: { paymentStatus: "PARTIAL" } });
+      }
+      if (body.status === "CANCELLED" && booking.transport?.driverId) {
+        await tx.driver.update({ where: { id: booking.transport.driverId }, data: { available: true } });
+      }
+      if (body.status === "CANCELLED" && booking.transport) {
+        await tx.transportBooking.update({ where: { bookingId: id }, data: { status: "CANCELLED" } });
+      }
+      if (requestedStatus === "REFUNDED") {
+        await tx.booking.update({ where: { id }, data: { paymentStatus: "REFUNDED" } });
+      }
+      return tx.booking.findUniqueOrThrow({ where: { id } });
+    }, { isolationLevel: "Serializable", maxWait: 5000, timeout: 10000 });
   } catch (error) {
-    if (error instanceof Error && error.message === "BOOKING_STATE_CONFLICT") return NextResponse.json({ error: "Booking was changed by another request. Refresh and retry." }, { status: 409 });
+    if (error instanceof Error && error.message === "BOOKING_STATE_CONFLICT") {
+      return NextResponse.json({ error: "Booking was changed by another request. Refresh and retry." }, { status: 409 });
+    }
     throw error;
   }
   await writeAuditLog({ userId: user.id, action: body.status ? "BOOKING_STATUS_CHANGED" : "BOOKING_UPDATED", entity: "Booking", entityId: id, metadata: body.status ? { from: booking.status, to: requestedStatus } : undefined });
