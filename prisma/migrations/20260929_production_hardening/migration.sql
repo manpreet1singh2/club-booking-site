@@ -1,3 +1,5 @@
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 -- Production-safe schema hardening.
 -- This migration intentionally does not rewrite booking/event data.
 -- If duplicate (clubId, slug) pairs already exist, resolve them before applying.
