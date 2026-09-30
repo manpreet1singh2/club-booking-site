@@ -18,14 +18,33 @@ export async function GET(req: Request) {
   const to = searchParams.get("to");
   const clubId = searchParams.get("clubId");
   const paymentStatus = searchParams.get("paymentStatus");
-  const transportType = searchParams.get("transportType");\n  const limit = Math.min(Math.max(Number(searchParams.get("limit") || "1000"), 1), 5000);
+  const transportType = searchParams.get("transportType");\n  const rawLimit = searchParams.get("limit") ?? "1000";
+  const parsedLimit = Number(rawLimit);
+  if (!Number.isInteger(parsedLimit) || parsedLimit < 1 || parsedLimit > 5000) {
+    return NextResponse.json({ error: "Invalid limit" }, { status: 400 });
+  }
+  const limit = parsedLimit;
 
-  const where: any = {};
+  const paymentStatuses = ["PENDING","PAID","FAILED","REFUNDED","PARTIAL"];
+  const transportTypes = ["NONE","CAB","BIKE"];
+  if (paymentStatus && !paymentStatuses.includes(paymentStatus)) {
+    return NextResponse.json({ error: "Invalid payment status" }, { status: 400 });
+  }
+  if (transportType && !transportTypes.includes(transportType)) {
+    return NextResponse.json({ error: "Invalid transport type" }, { status: 400 });
+  }
+
+  const where: Record<string, any> = {};
   if (from || to) {
     where.createdAt = {};
-    if (from) where.createdAt.gte = new Date(from);
+    if (from) {
+      const start = new Date(from);
+      if (Number.isNaN(start.getTime())) return NextResponse.json({ error: "Invalid from date" }, { status: 400 });
+      where.createdAt.gte = start;
+    }
     if (to) {
       const end = new Date(to);
+      if (Number.isNaN(end.getTime())) return NextResponse.json({ error: "Invalid to date" }, { status: 400 });
       end.setHours(23, 59, 59, 999);
       where.createdAt.lte = end;
     }
