@@ -64,11 +64,16 @@ export async function POST(req: Request) {
       if (eventId) await prisma.paymentWebhookEvent.update({ where: { eventId }, data: { status: "PROCESSED", processedAt: new Date(), error: null } });
       if (confirmed) notifyBookingConfirmed(payment.bookingId).catch(() => undefined);
     } else if (event === "payment.failed") {
-      if (payment.status !== "PAID" && payment.status !== "REFUNDED") {
-        await prisma.payment.update({ where: { id: payment.id }, data: { status: "FAILED", gatewayPaymentId: String(entity.id), webhookEventId: eventId || null, gateway: "razorpay" } }).catch(error => {
-          if (!(eventId && error instanceof Error && error.message.toLowerCase().includes("unique"))) throw error;
+      await prisma.$transaction(async tx => {
+        const current = await tx.payment.findUnique({ where: { id: payment.id } });
+        if (!current || current.status === "PAID" || current.status === "REFUNDED") return;
+        if (current.gatewayPaymentId && current.gatewayPaymentId !== String(entity.id)) return;
+        const claimed = await tx.payment.updateMany({
+          where: { id: current.id, status: { in: ["PENDING", "FAILED", "PARTIAL"] }, gatewayPaymentId: current.gatewayPaymentId || null },
+          data: { status: "FAILED", gatewayPaymentId: String(entity.id), webhookEventId: eventId || null, gateway: "razorpay" },
         });
-      }
+        if (claimed.count !== 1) return;
+      });
     }
     return NextResponse.json({ received: true });
   } catch (error) {
