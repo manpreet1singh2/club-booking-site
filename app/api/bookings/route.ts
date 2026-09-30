@@ -47,6 +47,13 @@ function isSerializationConflict(error: unknown) {\n  return typeof error === "o
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     const body = bookingSchema.omit({ userId: true }).parse(await req.json());
+    const idempotencyKey = req.headers.get("x-idempotency-key")?.trim();
+    if (idempotencyKey && (idempotencyKey.length < 16 || idempotencyKey.length > 200)) return NextResponse.json({ error: "Invalid idempotency key" }, { status: 400 });
+    if (idempotencyKey) {
+      const existing = await prisma.booking.findUnique({ where: { idempotencyKey }, include: { club: true, package: true, event: true } });
+      if (existing && existing.userId === user.id) return NextResponse.json(existing, { status: 200 });
+      if (existing) return NextResponse.json({ error: "Idempotency key already belongs to another booking" }, { status: 409 });
+    }
 
     let booking;
     for (let attempt = 1; attempt <= 2; attempt++) {
@@ -81,6 +88,7 @@ function isSerializationConflict(error: unknown) {\n  return typeof error === "o
           return tx.booking.create({
             data: {
               bookingCode: createBookingCode(),
+              idempotencyKey: idempotencyKey || undefined,
               userId: user.id,
               clubId: body.clubId,
               eventId: body.eventId,
