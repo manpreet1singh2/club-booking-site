@@ -42,5 +42,5 @@ export async function createRazorpayRefund(paymentId: string, amount: number, re
   const secret = process.env.PAYMENT_WEBHOOK_SECRET;
   if (!secret) throw new Error("Payment webhook secret is not configured");
   const expected = crypto.createHmac("sha256", secret).update(body).digest("hex");
-  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+  const expectedBuffer = Buffer.from(expected);\n  const actualBuffer = Buffer.from(signature);\n  return expectedBuffer.length === actualBuffer.length && crypto.timingSafeEqual(expectedBuffer, actualBuffer);
 }
