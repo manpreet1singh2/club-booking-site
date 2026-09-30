@@ -90,7 +90,7 @@ async function sendWhatsApp(message: TemplateMessage) {
     where: { id: log.id },
     data: {
       status: retryable ? "RETRY_PENDING" : "FAILED",
-      attempt: attempt + 1,
+      attempt: Math.min(attempt + 1, log.maxAttempts),
       lastError: String(data?.error?.message || "WhatsApp request failed").slice(0, 500),
       nextAttemptAt: retryable ? new Date(Date.now() + Math.min(60 * 60 * 1000, 2 ** attempt * 60 * 1000)) : null,
       lockedAt: null,
