@@ -75,6 +75,12 @@ export async function POST(req: Request) {
         if (claimed.count !== 1) return;
       });
     }
+    if (eventId) {
+      await prisma.paymentWebhookEvent.update({
+        where: { eventId },
+        data: { status: "PROCESSED", processedAt: new Date(), error: null },
+      });
+    }
     return NextResponse.json({ received: true });
   } catch (error) {
     const message = error instanceof Error ? error.message.slice(0, 500) : "Webhook processing failed";
