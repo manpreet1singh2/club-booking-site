@@ -4,8 +4,10 @@ import { prisma } from "@/lib/prisma";
 
 export default async function EventDetail({ params }: { params: Promise<{ clubSlug: string; eventSlug: string }> }) {
   const { clubSlug, eventSlug } = await params;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
   const event = await prisma.event.findFirst({
-    where: { slug: eventSlug, club: { slug: clubSlug }, active: true },
+    where: { slug: eventSlug, club: { slug: clubSlug }, active: true, date: { gte: today } },
     include: { club: true, bookings: { where: { status: { in: ["PENDING_PAYMENT", "CONFIRMED"] } }, select: { guestCount: true } } },
   });
   if (!event) return notFound();
