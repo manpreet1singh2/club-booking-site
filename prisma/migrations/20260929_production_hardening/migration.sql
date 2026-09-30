@@ -68,3 +68,5 @@ CREATE INDEX "Booking_status_expiresAt_idx" ON "Booking"("status", "expiresAt");
 CREATE TABLE "LoginAttempt" ("id" TEXT NOT NULL, "keyHash" TEXT NOT NULL, "attempts" INTEGER NOT NULL DEFAULT 0, "windowStartedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "blockedUntil" TIMESTAMP(3), "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "LoginAttempt_pkey" PRIMARY KEY ("id"));
 CREATE UNIQUE INDEX "LoginAttempt_keyHash_key" ON "LoginAttempt"("keyHash");
 CREATE INDEX "LoginAttempt_blockedUntil_idx" ON "LoginAttempt"("blockedUntil");
+
+ALTER TABLE "Payment" ADD COLUMN "refundStartedAt" TIMESTAMP(3);
