@@ -47,7 +47,9 @@ export async function POST(req: Request) {
 
     if (!result.alreadyProcessed && result.updatedBooking.status === "CONFIRMED") notifyBookingConfirmed(result.updatedBooking.id).catch(() => undefined);
     return NextResponse.json({ ok: true, booking: result.updatedBooking });
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.message === "PAYMENT_STATE_CONFLICT") return NextResponse.json({ error: "Payment was already processed or changed. Refresh the booking." }, { status: 409 });
+    if (typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "P2034") return NextResponse.json({ error: "Payment verification conflicted with another transaction. Please retry." }, { status: 409 });
     return NextResponse.json({ error: "Payment verification failed" }, { status: 400 });
   }
 }
