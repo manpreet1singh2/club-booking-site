@@ -12,12 +12,27 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
       club: { select: { name: true, city: true, address: true } },
       event: { select: { name: true, date: true, startTime: true, endTime: true } },
       package: { select: { name: true } },
-      user: { select: { name: true } },
+      user: { select: { id: true, name: true } },
     },
   });
   if (!booking) return NextResponse.json({ valid: false, error: "Ticket not found" }, { status: 404 });
   const valid = booking.status === "CONFIRMED" && ["PAID","PARTIAL"].includes(booking.paymentStatus);
   const staff = viewer?.role === "SUPER_ADMIN" || viewer?.role === "CLUB_OWNER";
   if (viewer?.role === "CLUB_OWNER") { const owned = await prisma.club.findFirst({ where: { id: booking.clubId, ownerId: viewer.id }, select: { id: true } }); if (!owned) return NextResponse.json({ valid: false, error: "Forbidden", viewerRole: viewer.role }, { status: 403 }); }
-  return NextResponse.json({ valid, ticket: booking, viewerRole: viewer?.role || null, staff });
+  const ticket = staff || viewer?.id === (booking as typeof booking & { user: { id: string } }).user.id
+    ? booking
+    : {
+        bookingCode: booking.bookingCode,
+        clubId: booking.clubId,
+        status: booking.status,
+        paymentStatus: booking.paymentStatus,
+        guestCount: booking.guestCount,
+        transportType: booking.transportType,
+        visitDate: booking.visitDate,
+        pickupLocation: booking.pickupLocation,
+        club: booking.club,
+        event: booking.event,
+        package: booking.package,
+      };
+  return NextResponse.json({ valid, ticket, viewerRole: viewer?.role || null, staff });
 }
