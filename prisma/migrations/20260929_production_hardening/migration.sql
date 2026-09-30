@@ -61,3 +61,6 @@ CREATE INDEX "NotificationLog_lockedAt_idx" ON "NotificationLog"("lockedAt");
 
 ALTER TABLE "Booking" ADD COLUMN "idempotencyKey" TEXT;
 CREATE UNIQUE INDEX "Booking_idempotencyKey_key" ON "Booking"("idempotencyKey");
+
+ALTER TABLE "Booking" ADD COLUMN "expiresAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP + INTERVAL '15 minutes';
+CREATE INDEX "Booking_status_expiresAt_idx" ON "Booking"("status", "expiresAt");
