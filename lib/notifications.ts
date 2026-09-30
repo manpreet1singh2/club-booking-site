@@ -16,7 +16,8 @@ function normalizePhone(value: string) {
 export async function retryNotification(notificationId: string) {
   const log = await prisma.notificationLog.findUnique({ where: { id: notificationId } });
   if (!log || log.channel !== "WHATSAPP" || !["RETRY_PENDING", "PENDING", "PROCESSING"].includes(log.status)) return { sent: false, skipped: true };
-  return sendWhatsApp({ to: log.recipient, template: log.template, parameters: Array.isArray(log.parameters) ? log.parameters.map(String) : undefined, userId: log.userId, idempotencyKey: log.idempotencyKey });
+  const result = await sendWhatsApp({ to: log.recipient, template: log.template, parameters: Array.isArray(log.parameters) ? log.parameters.map(String) : undefined, userId: log.userId, idempotencyKey: log.idempotencyKey });
+  return result;
 }
 
 async function sendWhatsApp(message: TemplateMessage) {
