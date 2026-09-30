@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSession, SESSION_COOKIE, SESSION_TTL_SECONDS, verifyPassword } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
 export async function POST(req: Request) {
   try {
@@ -13,14 +14,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
     }
 
-    const token = createSessionToken();
-    await prisma.session.create({
-      data: {
-        tokenHash: hashSessionToken(token),
-        userId: user.id,
-        expiresAt: new Date(Date.now() + SESSION_TTL_SECONDS * 1000),
-      },
-    });
+    const token = await createSession(user.id);
 
     const response = NextResponse.json({ user: { id: user.id, name: user.name, email: user.email, role: user.role } });
     response.cookies.set(SESSION_COOKIE, token, {
