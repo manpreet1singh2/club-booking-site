@@ -11,6 +11,7 @@ function prismaCode(error: unknown) {
 
 export async function POST(req: Request) {
   const raw = await req.text();
+  if (raw.length > 1_000_000) return NextResponse.json({ error: "Webhook payload too large" }, { status: 413 });
   const signature = req.headers.get("x-razorpay-signature") || "";
   try {
     if (!signature || !verifyWebhookSignature(raw, signature)) return NextResponse.json({ error: "Invalid webhook signature" }, { status: 400 });
