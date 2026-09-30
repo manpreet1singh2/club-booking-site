@@ -42,7 +42,27 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(bookings);
 }
 
-function isSerializationConflict(error: unknown) {\n  return typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "P2034";\n}\n\nexport async function POST(req: NextRequest) {
+function prismaCode(error: unknown) {
+  return typeof error === "object" && error !== null && "code" in error
+    ? (error as { code?: string }).code
+    : undefined;
+}
+
+function isSerializationConflict(error: unknown) {
+  return prismaCode(error) === "P2034";
+}
+
+async function findIdempotentBooking(key: string, userId: string) {
+  const existing = await prisma.booking.findUnique({
+    where: { idempotencyKey: key },
+    include: { club: true, package: true, event: true },
+  });
+  if (!existing) return null;
+  if (existing.userId !== userId) throw new Error("Idempotency key already belongs to another booking");
+  return existing;
+}
+
+export async function POST(req: NextRequest) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
@@ -50,9 +70,12 @@ function isSerializationConflict(error: unknown) {\n  return typeof error === "o
     const idempotencyKey = req.headers.get("x-idempotency-key")?.trim();
     if (idempotencyKey && (idempotencyKey.length < 16 || idempotencyKey.length > 200)) return NextResponse.json({ error: "Invalid idempotency key" }, { status: 400 });
     if (idempotencyKey) {
-      const existing = await prisma.booking.findUnique({ where: { idempotencyKey }, include: { club: true, package: true, event: true } });
-      if (existing && existing.userId === user.id) return NextResponse.json(existing, { status: 200 });
-      if (existing) return NextResponse.json({ error: "Idempotency key already belongs to another booking" }, { status: 409 });
+      try {
+        const existing = await findIdempotentBooking(idempotencyKey, user.id);
+        if (existing) return NextResponse.json(existing, { status: 200 });
+      } catch (error) {
+        return NextResponse.json({ error: error instanceof Error ? error.message : "Idempotency conflict" }, { status: 409 });
+      }
     }
 
     let booking;
@@ -107,6 +130,13 @@ function isSerializationConflict(error: unknown) {\n  return typeof error === "o
         }, { isolationLevel: "Serializable", maxWait: 5000, timeout: 10000 });
         break;
       } catch (error) {
+        if (prismaCode(error) === "P2002" && idempotencyKey) {
+          const existing = await findIdempotentBooking(idempotencyKey, user.id);
+          if (existing) {
+            booking = existing;
+            break;
+          }
+        }
         if (!isSerializationConflict(error) || attempt === 2) throw error;
       }
     }
