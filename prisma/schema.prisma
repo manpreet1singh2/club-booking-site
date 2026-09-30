@@ -51,3 +51,4 @@ model Session { id String @id @default(cuid()) tokenHash String @unique userId S
   @@index([userId, expiresAt])
   @@index([expiresAt])
 }
+model LoginAttempt { id String @id @default(cuid()) keyHash String @unique attempts Int @default(0) windowStartedAt DateTime @default(now()) blockedUntil DateTime? updatedAt DateTime @updatedAt @@index([blockedUntil]) }
