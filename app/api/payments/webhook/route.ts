@@ -9,11 +9,12 @@ export async function POST(req: Request) {
   try {
     if (!signature || !verifyWebhookSignature(raw, signature)) return NextResponse.json({ error: "Invalid webhook signature" }, { status: 400 });
     const payload = JSON.parse(raw);
-    const event = String(payload.event || "");
-    const eventId = String(payload.id || "");
+    const event = String(payload.event || "").trim();
+    const eventId = String(payload.id || "").trim();
+    if (!event || event.length > 100 || !eventId || eventId.length > 200) return NextResponse.json({ error: "Invalid webhook payload" }, { status: 400 });
     const entity = payload.payload?.payment?.entity;
     if (!entity?.order_id || !entity?.id) return NextResponse.json({ received: true });
-    if (eventId) {
+    {
       const existingEvent = await prisma.paymentWebhookEvent.findUnique({ where: { eventId } });
       if (existingEvent?.status === "PROCESSED") return NextResponse.json({ received: true, duplicate: true });
       if (!existingEvent) {
@@ -40,7 +41,8 @@ export async function POST(req: Request) {
           if (current.gatewayPaymentId && current.gatewayPaymentId !== String(entity.id)) {
             throw new Error("Payment is already linked to a different gateway payment");
           }
-          const claimed = await tx.payment.updateMany({ where: { id: current.id, status: { in: ["PENDING", "FAILED", "PARTIAL"] }, gatewayPaymentId: current.gatewayPaymentId || null }, data: { status: "PAID", gatewayPaymentId: String(entity.id), webhookEventId: eventId || null, gateway: "razorpay" } });\n          if (claimed.count !== 1) return;
+          const claimed = await tx.payment.updateMany({ where: { id: current.id, status: { in: ["PENDING", "FAILED", "PARTIAL"] }, gatewayPaymentId: current.gatewayPaymentId || null }, data: { status: "PAID", gatewayPaymentId: String(entity.id), webhookEventId: eventId || null, gateway: "razorpay" } });
+          if (claimed.count !== 1) return;
           const aggregate = await tx.payment.aggregate({ where: { bookingId: current.bookingId, status: "PAID" }, _sum: { amount: true } });
           const paid = Number(aggregate._sum.amount || 0);
           const booking = await tx.booking.findUnique({ where: { id: current.bookingId } });
