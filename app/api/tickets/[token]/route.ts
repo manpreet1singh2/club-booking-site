@@ -32,7 +32,6 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
         guestCount: booking.guestCount,
         transportType: booking.transportType,
         visitDate: booking.visitDate,
-        pickupLocation: booking.pickupLocation,
         club: booking.club,
         event: booking.event,
         package: booking.package,
