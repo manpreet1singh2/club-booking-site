@@ -18,7 +18,7 @@ export async function GET(req: Request) {
   const to = searchParams.get("to");
   const clubId = searchParams.get("clubId");
   const paymentStatus = searchParams.get("paymentStatus");
-  const transportType = searchParams.get("transportType");
+  const transportType = searchParams.get("transportType");\n  const limit = Math.min(Math.max(Number(searchParams.get("limit") || "1000"), 1), 5000);
 
   const where: any = {};
   if (from || to) {
@@ -41,7 +41,7 @@ export async function GET(req: Request) {
   const bookings = await prisma.booking.findMany({
     where,
     orderBy: { createdAt: "desc" },
-    include: { user: true, club: true, event: true, package: true },
+    include: { user: true, club: true, event: true, package: true },\n    take: limit,
   });
 
   const header = ["Booking ID","Name","Phone","Email","Date","Time","Club","Package","Guests","Transport Type","Pickup Location","Payment Status","Booking Status","Total Amount","Advance Amount","Remaining Amount"];
