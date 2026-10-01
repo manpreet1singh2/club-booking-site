@@ -11,7 +11,14 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
   const booking = await prisma.booking.findUnique({
     where: { ticketToken: token },
     select: {
-      bookingCode: true, clubId: true, status: true, paymentStatus: true, guestCount: true, transportType: true, visitDate: true, pickupLocation: true,
+      bookingCode: true,
+      clubId: true,
+      status: true,
+      paymentStatus: true,
+      guestCount: true,
+      transportType: true,
+      visitDate: true,
+      pickupLocation: true,
       club: { select: { name: true, city: true, address: true } },
       event: { select: { name: true, date: true, startTime: true, endTime: true } },
       package: { select: { name: true } },
@@ -36,5 +43,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
         event: booking.event,
         package: booking.package,
       };
-  return NextResponse.json({ valid, ticket });
+  const response = NextResponse.json({ valid, ticket });
+  response.headers.set("Cache-Control", "private, no-store, max-age=0");
+  return response;
 }
