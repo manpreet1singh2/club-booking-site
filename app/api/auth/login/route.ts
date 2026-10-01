@@ -39,7 +39,7 @@ export async function POST(req: Request) {
     await prisma.loginAttempt.deleteMany({ where: { keyHash } });
     const token = await createSession(user.id);
 
-    const response = NextResponse.json({ user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+    const response = NextResponse.json({ user: { id: user.id, name: user.name, email: user.email, role: user.role } }, { headers: { "Cache-Control": "no-store" } });
     response.cookies.set(SESSION_COOKIE, token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
