@@ -156,7 +156,7 @@ export async function POST(req: Request) {
         if (error instanceof Error && error.message === "BOOKING_NOT_FOUND") return NextResponse.json({ received: true, retry: false, reconciliationRequired: true }, { status: 409 });
         throw error;
       }
-      if (eventId) await prisma.paymentWebhookEvent.update({ where: { eventId }, data: { status: "PROCESSED", processingStartedAt: null, processedAt: new Date(), error: null } });
+      if (eventId) await prisma.paymentWebhookEvent.update({ where: { provider_eventId: { provider: "razorpay", eventId } }, data: { status: "PROCESSED", processingStartedAt: null, processedAt: new Date(), error: null } });
       if (confirmed) notifyBookingConfirmed(payment.bookingId).catch(() => undefined);
     } else if (event === "payment.failed") {
       try {
