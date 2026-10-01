@@ -1,5 +1,5 @@
 import {NextResponse} from "next/server";
-import {getCurrentUser} from "@/lib/auth";
+import {getCurrentUser,isSameOrigin} from "@/lib/auth";
 import {prisma} from "@/lib/prisma";
 import {writeAuditLog} from "@/lib/audit";
 
@@ -8,6 +8,7 @@ function sameLocalDate(a:Date,b:Date){
 }
 
 export async function POST(req:Request){
+  if(!isSameOrigin(req))return NextResponse.json({error:"Invalid request origin"},{status:403});
   const user=await getCurrentUser();
   if(!user||!["SUPER_ADMIN","CLUB_OWNER"].includes(user.role))return NextResponse.json({error:"Forbidden"},{status:403});
   try{
