@@ -23,6 +23,13 @@ export async function POST(req: Request) {
     const receipt = payment.refundReceipt || "refund:" + payment.id;
     const matched = refunds.items.find(item => item.receipt === receipt);
     if (!matched) return NextResponse.json({ reconciled: false, message: "No matching gateway refund found. Do not retry automatically." });
+    const expectedAmountPaise = Math.round(Number(payment.amount) * 100);
+    if (!Number.isSafeInteger(expectedAmountPaise) || matched.amount !== expectedAmountPaise || matched.payment_id !== payment.gatewayPaymentId) {
+      return NextResponse.json({ reconciled: false, message: "Gateway refund details do not match the local payment. Manual reconciliation required." }, { status: 409 });
+    }
+    if (matched.status !== "processed") {
+      return NextResponse.json({ reconciled: false, message: "Gateway refund exists but is not processed yet. Do not retry automatically." }, { status: 409 });
+    }
 
     const saved = await prisma.payment.updateMany({
       where: { id: payment.id, status: "PAID", refundId: null, refundStartedAt: { not: null } },
