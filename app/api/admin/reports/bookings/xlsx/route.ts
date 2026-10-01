@@ -33,7 +33,11 @@ export async function GET(req: Request) {
   if (searchParams.get("transportType")) where.transportType = searchParams.get("transportType");
   if (user.role === "CLUB_OWNER") where.club = { ownerId: user.id };
 
-  const bookings = await prisma.booking.findMany({ where, take: limit, orderBy: { createdAt: "desc" }, include: { user:true, club:true, event:true, package:true, transport:true } });
+  const bookings = await prisma.booking.findMany({ where, take: limit, orderBy: { createdAt: "desc" }, select: {
+  bookingCode:true,user:{select:{name:true,phone:true,email:true}},club:{select:{name:true}},event:{select:{date:true,startTime:true}},package:{select:{name:true}},
+  guestCount:true,transportType:true,pickupLocation:true,paymentStatus:true,status:true,totalAmount:true,advanceAmount:true,remainingAmount:true,createdAt:true,
+  transport:{select:{pickupTime:true}}
+} });
   const rows = bookings.map(b => ({
     "Booking ID": spreadsheetSafe(b.bookingCode), "Name": spreadsheetSafe(b.user.name), "Phone": spreadsheetSafe(b.user.phone), "Email": spreadsheetSafe(b.user.email),
     "Date": spreadsheetSafe(b.event?.date ? b.event.date.toISOString().slice(0,10) : b.createdAt.toISOString().slice(0,10)),
