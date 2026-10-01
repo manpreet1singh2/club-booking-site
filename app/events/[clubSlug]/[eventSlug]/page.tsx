@@ -8,7 +8,17 @@ export default async function EventDetail({ params }: { params: Promise<{ clubSl
   today.setHours(0, 0, 0, 0);
   const event = await prisma.event.findFirst({
     where: { slug: eventSlug, club: { slug: clubSlug }, active: true, date: { gte: today } },
-    include: { club: true, bookings: { where: { status: { in: ["PENDING_PAYMENT", "CONFIRMED"] } }, select: { guestCount: true } } },
+    select: {
+      id: true,
+      clubId: true,
+      name: true,
+      date: true,
+      startTime: true,
+      endTime: true,
+      capacity: true,
+      club: { select: { id: true, name: true, city: true } },
+      bookings: { where: { status: { in: ["PENDING_PAYMENT", "CONFIRMED"] } }, select: { guestCount: true } },
+    },
   });
   if (!event) return notFound();
   const reserved = event.bookings.reduce((n, b) => n + b.guestCount, 0);
