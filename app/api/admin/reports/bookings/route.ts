@@ -2,8 +2,13 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-function csvCell(value: unknown) {
+function spreadsheetSafe(value: unknown) {
   const s = value == null ? "" : String(value);
+  return /^[=+\-@\t\r]/.test(s) ? "'" + s : s;
+}
+
+function csvCell(value: unknown) {
+  const s = spreadsheetSafe(value);
   return '"' + s.replaceAll('"', '""') + '"';
 }
 
