@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { hashPassword, hashPasswordResetToken, revokeAllUserSessions } from "@/lib/auth";
+import { hashPassword, hashPasswordResetToken } from "@/lib/auth";
 import { z } from "zod";
 
 const resetSchema = z.object({
