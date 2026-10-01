@@ -24,7 +24,9 @@ export async function GET() {
     prisma.transportBooking.count({ where: { booking: scope, status: { in: ["PENDING", "ASSIGNED"] } } }),
     prisma.transportBooking.count({ where: { booking: scope, status: { in: ["DRIVER_CONFIRMED", "ON_THE_WAY", "ARRIVED", "PICKED_UP"] } } }),
     user.role === "CLUB_OWNER" ? prisma.club.count({ where: { ownerId: user.id } }) : prisma.club.count(),
-    prisma.user.count(),
+    user.role === "CLUB_OWNER"
+      ? prisma.user.count({ where: { bookings: { some: { club: { ownerId: user.id } } } } })
+      : prisma.user.count(),
   ]);
 
   return NextResponse.json({
