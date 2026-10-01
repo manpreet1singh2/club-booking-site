@@ -1,5 +1,5 @@
 import {NextRequest,NextResponse} from "next/server";
-import {getCurrentUser} from "@/lib/auth";
+import {getCurrentUser,isSameOrigin} from "@/lib/auth";
 import {prisma} from "@/lib/prisma";
 import {notifyTransportAssigned} from "@/lib/notifications";
 import {transportCreateSchema} from "@/lib/validation";
@@ -48,6 +48,7 @@ export async function GET(req:NextRequest){
 }
 
 export async function POST(req:NextRequest){
+  if(!isSameOrigin(req))return NextResponse.json({error:"Invalid request origin"},{status:403});
   const user=await getCurrentUser();
   if(!user)return NextResponse.json({error:"Authentication required"},{status:401});
   if(user.role!=="SUPER_ADMIN"&&user.role!=="CLUB_OWNER")return NextResponse.json({error:"Forbidden"},{status:403});
