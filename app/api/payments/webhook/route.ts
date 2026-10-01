@@ -51,8 +51,11 @@ export async function POST(req: Request) {
         } catch (error) {
           if (prismaCode(error) !== "P2002") throw error;
           const racedEvent = await prisma.paymentWebhookEvent.findUnique({ where: { eventId } });
-          if (racedEvent?.status === "PROCESSED" || racedEvent) {
+          if (racedEvent?.status === "PROCESSED") {
             return NextResponse.json({ received: true, duplicate: true });
+          }
+          if (racedEvent) {
+            return NextResponse.json({ received: true, retry: true }, { status: 409 });
           }
           throw error;
         }
