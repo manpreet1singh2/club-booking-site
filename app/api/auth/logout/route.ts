@@ -9,7 +9,7 @@ export async function POST(req: Request) {
   const token = jar.get(SESSION_COOKIE)?.value;
   if (token) await prisma.session.deleteMany({ where: { tokenHash: hashSessionToken(token) } });
 
-  const response = NextResponse.json({ ok: true });
+  const response = NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
   response.cookies.set(SESSION_COOKIE, "", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
