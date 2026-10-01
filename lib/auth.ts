@@ -88,3 +88,22 @@ export async function requireUser() {
   if (!user) throw new Error("UNAUTHORIZED");
   return user;
 }
+
+export function isSameOrigin(req: Request) {
+  const origin = req.headers.get("origin");
+  if (origin) {
+    try {
+      return origin === new URL(req.url).origin;
+    } catch {
+      return false;
+    }
+  }
+
+  const referer = req.headers.get("referer");
+  if (!referer) return false;
+  try {
+    return new URL(referer).origin === new URL(req.url).origin;
+  } catch {
+    return false;
+  }
+}
