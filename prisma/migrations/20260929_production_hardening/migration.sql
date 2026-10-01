@@ -70,3 +70,5 @@ CREATE UNIQUE INDEX "LoginAttempt_keyHash_key" ON "LoginAttempt"("keyHash");
 CREATE INDEX "LoginAttempt_blockedUntil_idx" ON "LoginAttempt"("blockedUntil");
 
 ALTER TABLE "Payment" ADD COLUMN "refundStartedAt" TIMESTAMP(3);
+
+CREATE INDEX "Payment_status_refundStartedAt_idx" ON "Payment"("status", "refundStartedAt");
