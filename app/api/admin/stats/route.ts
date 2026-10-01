@@ -29,7 +29,7 @@ export async function GET() {
       : prisma.user.count(),
   ]);
 
-  return NextResponse.json({
+  const response = NextResponse.json({
     totalBookings,
     todayBookings,
     confirmedBookings,
@@ -41,4 +41,6 @@ export async function GET() {
     clubs,
     users,
   });
+  response.headers.set("Cache-Control", "private, no-store, max-age=0");
+  return response;
 }
