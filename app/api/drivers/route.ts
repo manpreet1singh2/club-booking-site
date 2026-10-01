@@ -41,7 +41,21 @@ export async function POST(req: NextRequest) {
         role: "DRIVER",
         driver: { create: { vehicleType, vehicleNumber: body.vehicleNumber ? String(body.vehicleNumber) : null } },
       },
-      include: { driver: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        role: true,
+        driver: {
+          select: {
+            id: true,
+            vehicleType: true,
+            vehicleNumber: true,
+            available: true,
+          },
+        },
+      },
     });
     return NextResponse.json(driver, { status: 201 });
   } catch {
