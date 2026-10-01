@@ -3,17 +3,22 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { verifyRazorpaySignature, fetchRazorpayPayment } from "@/lib/razorpay";
 import { notifyBookingConfirmed } from "@/lib/notifications";
+import { z } from "zod";
+
+const paymentVerificationSchema = z.object({
+  razorpay_order_id: z.string().trim().min(1).max(100),
+  razorpay_payment_id: z.string().trim().min(1).max(100),
+  razorpay_signature: z.string().trim().min(1).max(500),
+});
 
 export async function POST(req: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
 
   try {
-    const body = await req.json();
-    const orderId = String(body.razorpay_order_id || "");
-    const paymentId = String(body.razorpay_payment_id || "");
-    const signature = String(body.razorpay_signature || "");
-    if (!orderId || !paymentId || !signature) return NextResponse.json({ error: "Incomplete payment verification" }, { status: 400 });
+    const parsed = paymentVerificationSchema.safeParse(await req.json());
+    if (!parsed.success) return NextResponse.json({ error: "Incomplete or invalid payment verification data" }, { status: 400 });
+    const { razorpay_order_id: orderId, razorpay_payment_id: paymentId, razorpay_signature: signature } = parsed.data;
 
     const payment = await prisma.payment.findUnique({ where: { gatewayOrderId: orderId }, include: { booking: true } });
     if (!payment) return NextResponse.json({ error: "Payment order not found" }, { status: 404 });
