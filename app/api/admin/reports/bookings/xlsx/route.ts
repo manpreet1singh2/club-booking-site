@@ -3,6 +3,11 @@ import * as XLSX from "xlsx";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
+function spreadsheetSafe(value: unknown) {
+  const s = value == null ? "" : String(value);
+  return /^[=+\-@\t\r]/.test(s) ? "'" + s : s;
+}
+
 export async function GET(req: Request) {
   const user = await getCurrentUser();
   if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "CLUB_OWNER")) return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
@@ -30,11 +35,11 @@ export async function GET(req: Request) {
 
   const bookings = await prisma.booking.findMany({ where, take: limit, orderBy: { createdAt: "desc" }, include: { user:true, club:true, event:true, package:true, transport:true } });
   const rows = bookings.map(b => ({
-    "Booking ID": b.bookingCode, "Name": b.user.name, "Phone": b.user.phone ?? "", "Email": b.user.email,
-    "Date": b.event?.date ? b.event.date.toISOString().slice(0,10) : b.createdAt.toISOString().slice(0,10),
-    "Time": b.event?.startTime ?? "", "Club": b.club.name, "Package": b.package.name, "Guests": b.guestCount,
-    "Transport Type": b.transportType, "Pickup Location": b.pickupLocation ?? "", "Pickup Time": b.transport?.pickupTime?.toISOString() ?? "",
-    "Payment Status": b.paymentStatus, "Booking Status": b.status, "Total Amount": Number(b.totalAmount),
+    "Booking ID": spreadsheetSafe(b.bookingCode), "Name": spreadsheetSafe(b.user.name), "Phone": spreadsheetSafe(b.user.phone), "Email": spreadsheetSafe(b.user.email),
+    "Date": spreadsheetSafe(b.event?.date ? b.event.date.toISOString().slice(0,10) : b.createdAt.toISOString().slice(0,10)),
+    "Time": spreadsheetSafe(b.event?.startTime), "Club": spreadsheetSafe(b.club.name), "Package": spreadsheetSafe(b.package.name), "Guests": b.guestCount,
+    "Transport Type": spreadsheetSafe(b.transportType), "Pickup Location": spreadsheetSafe(b.pickupLocation), "Pickup Time": spreadsheetSafe(b.transport?.pickupTime?.toISOString()),
+    "Payment Status": spreadsheetSafe(b.paymentStatus), "Booking Status": spreadsheetSafe(b.status), "Total Amount": Number(b.totalAmount),
     "Advance Amount": Number(b.advanceAmount), "Remaining Amount": Number(b.remainingAmount)
   }));
   const sheet = XLSX.utils.json_to_sheet(rows);
