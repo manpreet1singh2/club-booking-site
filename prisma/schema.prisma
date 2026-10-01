@@ -58,3 +58,4 @@ model Session { id String @id @default(cuid()) tokenHash String @unique userId S
   @@index([expiresAt])
 }
 model LoginAttempt { id String @id @default(cuid()) keyHash String @unique attempts Int @default(0) windowStartedAt DateTime @default(now()) blockedUntil DateTime? updatedAt DateTime @updatedAt @@index([blockedUntil]) }
+model PasswordResetAttempt { id String @id @default(cuid()) keyHash String @unique attempts Int @default(0) windowStartedAt DateTime @default(now()) updatedAt DateTime @updatedAt @@index([windowStartedAt]) }
