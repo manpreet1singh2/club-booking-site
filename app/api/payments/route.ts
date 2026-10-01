@@ -33,6 +33,7 @@ export async function POST(req: NextRequest) {
     const gateway = typeof body.gateway === "string" ? body.gateway.trim().slice(0, 50) : "manual";
     const transactionId = typeof body.transactionId === "string" ? body.transactionId.trim().slice(0, 100) : null;
     const amount = Number(body.amount);
+    const idempotencyKey = req.headers.get("x-idempotency-key")?.trim() || "";
 
     if (!bookingId || bookingId.length > 100) {
       return NextResponse.json({ error: "Invalid booking ID" }, { status: 400 });
@@ -40,8 +41,16 @@ export async function POST(req: NextRequest) {
     if (!Number.isFinite(amount) || amount <= 0) {
       return NextResponse.json({ error: "Invalid payment amount" }, { status: 400 });
     }
+    if (idempotencyKey.length < 16 || idempotencyKey.length > 200) {
+      return NextResponse.json({ error: "A valid x-idempotency-key is required" }, { status: 400 });
+    }
 
     const result = await prisma.$transaction(async tx => {
+      const replay = await tx.payment.findUnique({
+        where: { orderCreationKey: `manual:${bookingId}:${idempotencyKey}` },
+      });
+      if (replay) return { payment: replay };
+
       const booking = await tx.booking.findUnique({
         where: { id: bookingId },
         include: { payments: { where: { status: "PAID" }, select: { amount: true } } },
@@ -61,6 +70,7 @@ export async function POST(req: NextRequest) {
           bookingId: booking.id,
           amount,
           status: "PAID",
+          orderCreationKey: `manual:${booking.id}:${idempotencyKey}`,
           gateway: gateway || "manual",
           transactionId,
         },
