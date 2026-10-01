@@ -43,22 +43,29 @@ export async function POST(req: Request) {
     if (!entityResult.success) return NextResponse.json({ received: true });
     const entity = entityResult.data;
     {
-      const existingEvent = await prisma.paymentWebhookEvent.findUnique({ where: { eventId } });
+      const existingEvent = await prisma.paymentWebhookEvent.findUnique({
+        where: { provider_eventId: { provider: "razorpay", eventId } },
+      });
       if (existingEvent?.status === "PROCESSED") return NextResponse.json({ received: true, duplicate: true });
+      if (existingEvent?.status === "PROCESSING") return NextResponse.json({ received: true, retry: true }, { status: 409 });
       if (!existingEvent) {
         try {
-          await prisma.paymentWebhookEvent.create({ data: { provider: "razorpay", eventId, event, payload } });
+          await prisma.paymentWebhookEvent.create({ data: { provider: "razorpay", eventId, event, payload, status: "PROCESSING" } });
         } catch (error) {
           if (prismaCode(error) !== "P2002") throw error;
-          const racedEvent = await prisma.paymentWebhookEvent.findUnique({ where: { eventId } });
-          if (racedEvent?.status === "PROCESSED") {
-            return NextResponse.json({ received: true, duplicate: true });
-          }
-          if (racedEvent) {
-            return NextResponse.json({ received: true, retry: true }, { status: 409 });
-          }
+          const racedEvent = await prisma.paymentWebhookEvent.findUnique({
+            where: { provider_eventId: { provider: "razorpay", eventId } },
+          });
+          if (racedEvent?.status === "PROCESSED") return NextResponse.json({ received: true, duplicate: true });
+          if (racedEvent?.status === "PROCESSING") return NextResponse.json({ received: true, retry: true }, { status: 409 });
           throw error;
         }
+      } else {
+        const claimed = await prisma.paymentWebhookEvent.updateMany({
+          where: { provider: "razorpay", eventId, status: { in: ["RECEIVED", "FAILED"] } },
+          data: { status: "PROCESSING", error: null },
+        });
+        if (claimed.count !== 1) return NextResponse.json({ received: true, retry: true }, { status: 409 });
       }
     }
 
