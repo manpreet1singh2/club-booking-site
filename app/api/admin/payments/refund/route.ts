@@ -53,6 +53,17 @@ export async function POST(req: Request) {
         }
       }
 
+      const expectedAmountPaise = Math.round(amount * 100);
+      if (
+        !refund ||
+        refund.id !== String(refund.id) ||
+        refund.payment_id !== payment.gatewayPaymentId ||
+        refund.amount !== expectedAmountPaise ||
+        refund.status !== "processed"
+      ) {
+        return NextResponse.json({ error: "Gateway refund response could not be safely verified. Reconcile the refund before retrying." }, { status: 409 });
+      }
+
       const saved = await prisma.payment.updateMany({
         where: { id: payment.id, status: "PAID", refundId: null, refundStartedAt: { not: null } },
         data: { refundId: refund.id, refundReceipt: receipt, refundedAmount: amount, refundStartedAt: null, status: "REFUNDED" },
