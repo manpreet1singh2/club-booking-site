@@ -28,6 +28,7 @@ CREATE TABLE "PaymentWebhookEvent" (
   "payload" JSONB,
   "error" TEXT,
   "receivedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "processingStartedAt" TIMESTAMP(3),
   "processedAt" TIMESTAMP(3),
   CONSTRAINT "PaymentWebhookEvent_pkey" PRIMARY KEY ("id")
 );
