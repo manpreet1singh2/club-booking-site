@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, isSameOrigin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(req: NextRequest) {
@@ -22,6 +22,7 @@ export async function GET(req: NextRequest) {
 // This endpoint records provider-confirmed payments only.
 // Client-side callers cannot mark a payment as PAID.
 export async function POST(req: NextRequest) {
+  if(!isSameOrigin(req))return NextResponse.json({error:"Invalid request origin"},{status:403});
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
   if (user.role !== "SUPER_ADMIN") return NextResponse.json({ error: "Payment confirmation is provider-controlled" }, { status: 403 });
