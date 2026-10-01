@@ -54,6 +54,18 @@ export async function POST(req: Request) {
         if (!existingEvent.processingStartedAt || existingEvent.processingStartedAt > staleBefore) {
           return NextResponse.json({ received: true, retry: true }, { status: 409 });
         }
+        const reclaimed = await prisma.paymentWebhookEvent.updateMany({
+          where: {
+            provider: "razorpay",
+            eventId,
+            status: "PROCESSING",
+            processingStartedAt: { lte: staleBefore },
+          },
+          data: { processingStartedAt: new Date(), error: null },
+        });
+        if (reclaimed.count !== 1) {
+          return NextResponse.json({ received: true, retry: true }, { status: 409 });
+        }
       }
       if (!existingEvent) {
         try {
@@ -67,6 +79,18 @@ export async function POST(req: Request) {
           if (racedEvent?.status === "PROCESSING") {
             const staleBefore = new Date(Date.now() - WEBHOOK_PROCESSING_STALE_MS);
             if (!racedEvent.processingStartedAt || racedEvent.processingStartedAt > staleBefore) {
+              return NextResponse.json({ received: true, retry: true }, { status: 409 });
+            }
+            const reclaimed = await prisma.paymentWebhookEvent.updateMany({
+              where: {
+                provider: "razorpay",
+                eventId,
+                status: "PROCESSING",
+                processingStartedAt: { lte: staleBefore },
+              },
+              data: { processingStartedAt: new Date(), error: null },
+            });
+            if (reclaimed.count !== 1) {
               return NextResponse.json({ received: true, retry: true }, { status: 409 });
             }
           }
