@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { hashPassword } from "@/lib/auth";
+import { hashPassword, isSameOrigin } from "@/lib/auth";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -16,6 +16,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  if(!isSameOrigin(req))return NextResponse.json({error:"Invalid request origin"},{status:403});
   const user = await getCurrentUser();
   if (!user || user.role !== "SUPER_ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
