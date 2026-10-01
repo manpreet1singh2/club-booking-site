@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, isSameOrigin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/lib/audit";
 
@@ -13,6 +13,7 @@ export async function GET() {
 }
 
 export async function PATCH(req: Request) {
+  if(!isSameOrigin(req))return NextResponse.json({error:"Invalid request origin"},{status:403});
   const u = await getCurrentUser();
   if (u?.role !== "SUPER_ADMIN") return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
 
