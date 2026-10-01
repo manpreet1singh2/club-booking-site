@@ -17,7 +17,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (!parsed.success || !assignmentParsed.success) return NextResponse.json({ error: "Invalid driver update" }, { status: 400 });
     if (!parsed.success) return NextResponse.json({ error: "Invalid driver update" }, { status: 400 });
     const body = parsed.data;
-    const clubIds = [...new Set(assignmentParsed.data.clubIds)];
+    const clubIds = assignmentParsed.data.clubIds === undefined ? undefined : [...new Set(assignmentParsed.data.clubIds)];
     const existing = await prisma.driver.findUnique({
       where: { id },
       include: {
@@ -35,6 +35,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       ...(body.available !== undefined ? { available: Boolean(body.available) } : {}),
     };
     const updated = await prisma.$transaction(async tx => {
+      if (clubIds === undefined) return tx.driver.update({ where: { id }, data, select: { id: true, userId: true, vehicleType: true, vehicleNumber: true, available: true, clubAssignments: { select: { clubId: true } } } });
       const clubs = await tx.club.findMany({ where: { id: { in: clubIds } }, select: { id: true } });
       if (clubs.length !== clubIds.length) throw new Error("One or more clubs were not found");
       const activeAssignments = await tx.transportBooking.count({
