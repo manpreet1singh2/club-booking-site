@@ -179,7 +179,7 @@ export async function POST(req: Request) {
     }
     if (eventId) {
       await prisma.paymentWebhookEvent.update({
-        where: { eventId },
+        where: { provider_eventId: { provider: "razorpay", eventId } },
         data: { status: "PROCESSED", processingStartedAt: null, processedAt: new Date(), error: null },
       });
     }
@@ -189,7 +189,7 @@ export async function POST(req: Request) {
     try {
       const payload = JSON.parse(raw);
       const eventId = String(payload.id || "");
-      if (eventId) await prisma.paymentWebhookEvent.updateMany({ where: { eventId }, data: { status: "FAILED", processingStartedAt: null, error: message } });
+      if (eventId) await prisma.paymentWebhookEvent.updateMany({ where: { provider: "razorpay", eventId }, data: { status: "FAILED", processingStartedAt: null, error: message } });
     } catch {}
     return NextResponse.json({ error: "Webhook processing failed" }, { status: 400 });
   }
