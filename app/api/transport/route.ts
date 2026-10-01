@@ -18,9 +18,32 @@ export async function GET(req:NextRequest){
     where:user.role==="SUPER_ADMIN"?driverId?{driverId}:{}
       :user.role==="CLUB_OWNER"?{...(driverId?{driverId}:{}),booking:{club:{ownerId:user.id}}}
       :user.role==="DRIVER"?{driver:{userId:user.id}}:{booking:{userId:user.id}},
-    include:{booking:{include:{club:true,user:{select:{id:true,name:true,phone:true}}}},driver:{include:{user:{select:{id:true,name:true,phone:true}}}}},
+    include:{
+      booking:{include:{club:{select:{id:true,name:true,city:true,address:true}},user:{select:{id:true,name:true,phone:true}}}},
+      driver:{include:{user:{select:{id:true,name:true,phone:true}}}},
+    },
     orderBy:{pickupTime:"asc"}
   });
+
+  if(user.role==="DRIVER"){
+    return NextResponse.json(transport.map(ride=>({
+      id:ride.id,
+      bookingId:ride.bookingId,
+      type:ride.type,
+      status:ride.status,
+      pickupLocation:ride.pickupLocation,
+      pickupTime:ride.pickupTime,
+      booking:{
+        id:ride.booking.id,
+        bookingCode:ride.booking.bookingCode,
+        guestCount:ride.booking.guestCount,
+        visitDate:ride.booking.visitDate,
+        club:ride.booking.club,
+        customer:ride.booking.user,
+      },
+    })));
+  }
+
   return NextResponse.json(transport);
 }
 
