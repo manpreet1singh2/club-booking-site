@@ -29,7 +29,9 @@ export async function GET(req: NextRequest) {
       refundStartedAt: true,
     },
   });
-  return NextResponse.json(payments);
+  const response = NextResponse.json(payments);
+  response.headers.set("Cache-Control", "private, no-store, max-age=0");
+  return response;
 }
 
 // This endpoint records provider-confirmed payments only.
@@ -63,7 +65,8 @@ export async function POST(req: NextRequest) {
         where: { orderCreationKey: `manual:${bookingId}:${idempotencyKey}` },
       });
       if (replay) {
-        const sameRequest = Number(replay.amount) === amount && replay.gateway === (gateway || "manual") && replay.transactionId === transactionId;\n        if (!sameRequest) return { error: "Idempotency key was already used for a different payment", status: 409 };
+        const sameRequest = Number(replay.amount) === amount && replay.gateway === (gateway || "manual") && replay.transactionId === transactionId;
+        if (!sameRequest) return { error: "Idempotency key was already used for a different payment", status: 409 };
         return { payment: replay };
       }
 
@@ -89,6 +92,17 @@ export async function POST(req: NextRequest) {
           orderCreationKey: `manual:${booking.id}:${idempotencyKey}`,
           gateway: gateway || "manual",
           transactionId,
+        },
+        select: {
+          id: true,
+          bookingId: true,
+          amount: true,
+          status: true,
+          gateway: true,
+          transactionId: true,
+          createdAt: true,
+          refundedAmount: true,
+          refundStartedAt: true,
         },
       });
 
