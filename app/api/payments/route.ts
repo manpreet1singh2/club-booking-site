@@ -9,11 +9,11 @@ export async function GET(req: NextRequest) {
   const bookingId = new URL(req.url).searchParams.get("bookingId");
   if (!bookingId) return NextResponse.json({ error: "bookingId is required" }, { status: 400 });
 
-  const booking = await prisma.booking.findUnique({ where: { id: bookingId }, select: { userId: true } });
+  const booking = await prisma.booking.findUnique({ where: { id: bookingId }, select: { userId: true, club: { select: { ownerId: true } } } });
   if (!booking) return NextResponse.json({ error: "Booking not found" }, { status: 404 });
 
-  const privileged = user.role === "SUPER_ADMIN" || user.role === "CLUB_OWNER";
-  if (booking.userId !== user.id && !privileged) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const allowed = booking.userId === user.id || user.role === "SUPER_ADMIN" || (user.role === "CLUB_OWNER" && booking.club.ownerId === user.id);
+  if (!allowed) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const payments = await prisma.payment.findMany({
     where: { bookingId },
