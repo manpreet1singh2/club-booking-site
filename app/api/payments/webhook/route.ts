@@ -5,6 +5,7 @@ import { notifyBookingConfirmed } from "@/lib/notifications";
 import { z } from "zod";
 
 const webhookEventSchema = z.enum(["payment.captured", "order.paid", "payment.failed"]);
+const webhookEventIdSchema = z.string().trim().min(1).max(200).regex(/^[A-Za-z0-9._:-]+$/);
 
 const webhookEntitySchema = z.object({
   id: z.string().trim().min(1).max(100),
@@ -28,7 +29,7 @@ export async function POST(req: Request) {
     const payload = JSON.parse(raw);
     const event = String(payload.event || "").trim();
     const eventId = String(payload.id || "").trim();
-    if (!event || event.length > 100 || !eventId || eventId.length > 200) return NextResponse.json({ error: "Invalid webhook payload" }, { status: 400 });
+    if (!event || event.length > 100 || !webhookEventIdSchema.safeParse(eventId).success) return NextResponse.json({ error: "Invalid webhook payload" }, { status: 400 });
     const eventResult = webhookEventSchema.safeParse(event);
     if (!eventResult.success) return NextResponse.json({ received: true, ignored: true });
     const entityResult = webhookEntitySchema.safeParse(payload.payload?.payment?.entity);
