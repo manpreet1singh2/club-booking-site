@@ -22,7 +22,7 @@ model Payment { id String @id @default(cuid()) bookingId String booking Booking 
   @@index([bookingId, status])
   @@index([status, refundStartedAt])
 }
-model PaymentWebhookEvent { id String @id @default(cuid()) provider String eventId String event String status WebhookEventStatus @default(RECEIVED) payload Json? error String? receivedAt DateTime @default(now()) processedAt DateTime?
+model PaymentWebhookEvent { id String @id @default(cuid()) provider String eventId String event String status WebhookEventStatus @default(RECEIVED) payload Json? error String? receivedAt DateTime @default(now()) processingStartedAt DateTime? processedAt DateTime?
   @@unique([provider, eventId])
   @@index([eventId])
   @@index([status, receivedAt])
