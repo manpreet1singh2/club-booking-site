@@ -15,7 +15,6 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const parsed = driverUpdateSchema.safeParse(rawBody);
     const assignmentParsed = driverClubAssignmentSchema.safeParse(rawBody);
     if (!parsed.success || !assignmentParsed.success) return NextResponse.json({ error: "Invalid driver update" }, { status: 400 });
-    if (!parsed.success) return NextResponse.json({ error: "Invalid driver update" }, { status: 400 });
     const body = parsed.data;
     const clubIds = assignmentParsed.data.clubIds === undefined ? undefined : [...new Set(assignmentParsed.data.clubIds)];
     const existing = await prisma.driver.findUnique({
