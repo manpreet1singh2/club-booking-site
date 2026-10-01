@@ -6,10 +6,11 @@ import { writeAuditLog } from "@/lib/audit";
 export async function GET() {
   const u = await getCurrentUser();
   if (u?.role !== "SUPER_ADMIN") return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
-  return NextResponse.json(await prisma.user.findMany({
+  const users = await prisma.user.findMany({
     select: { id: true, name: true, email: true, phone: true, role: true, createdAt: true, _count: { select: { bookings: true } } },
     orderBy: { createdAt: "desc" },
-  }));
+  });
+  return NextResponse.json(users, { headers: { "Cache-Control": "private, no-store, max-age=0" } });
 }
 
 export async function PATCH(req: Request) {
@@ -65,7 +66,7 @@ export async function PATCH(req: Request) {
     }, { isolationLevel: "Serializable" });
 
     await writeAuditLog({ userId: u.id, action: "ROLE_CHANGED", entity: "User", entityId: id, metadata: { from: target.role, to: role } });
-    return NextResponse.json(updated);
+    return NextResponse.json(updated, { headers: { "Cache-Control": "private, no-store, max-age=0" } });
   } catch (error) {
     if (error instanceof Error && error.message === "LAST_SUPER_ADMIN") {
       return NextResponse.json({ error: "At least one super admin must remain" }, { status: 409 });
