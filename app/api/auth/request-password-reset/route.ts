@@ -28,7 +28,7 @@ export async function POST(req: Request) {
 
   try {
     const parsed = requestSchema.safeParse(await req.json());
-    if (!parsed.success) return NextResponse.json(generic);
+    if (!parsed.success) return NextResponse.json(generic,{headers:{"Cache-Control":"no-store"}});
 
     const email = parsed.data.email;
     const keyHash = requestKey(email, req);
@@ -37,7 +37,7 @@ export async function POST(req: Request) {
     const recent = await prisma.passwordResetAttempt.findUnique({ where: { keyHash } });
     const windowExpired = !recent || now.getTime() - recent.windowStartedAt.getTime() >= WINDOW_MS;
     if (recent && !windowExpired && recent.attempts >= MAX_REQUESTS) {
-      return NextResponse.json(generic);
+      return NextResponse.json(generic,{headers:{"Cache-Control":"no-store"}});
     }
 
     if (windowExpired) {
@@ -51,11 +51,11 @@ export async function POST(req: Request) {
         where: { id: recent.id, windowStartedAt: recent.windowStartedAt, attempts: { lt: MAX_REQUESTS } },
         data: { attempts: { increment: 1 } },
       });
-      if (incremented.count !== 1) return NextResponse.json(generic);
+      if (incremented.count !== 1) return NextResponse.json(generic,{headers:{"Cache-Control":"no-store"}});
     }
 
     const user = await prisma.user.findUnique({ where: { email }, select: { id: true, email: true } });
-    if (!user) return NextResponse.json(generic);
+    if (!user) return NextResponse.json(generic,{headers:{"Cache-Control":"no-store"}});
 
     await prisma.passwordResetToken.deleteMany({ where: { userId: user.id, usedAt: null } });
 
@@ -77,8 +77,8 @@ export async function POST(req: Request) {
       throw new Error("PASSWORD_RESET_DELIVERY_FAILED");
     }
 
-    return NextResponse.json(generic);
+    return NextResponse.json(generic,{headers:{"Cache-Control":"no-store"}});
   } catch {
-    return NextResponse.json(generic);
+    return NextResponse.json(generic,{headers:{"Cache-Control":"no-store"}});
   }
 }
