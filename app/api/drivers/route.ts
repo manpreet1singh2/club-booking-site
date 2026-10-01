@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     const clubs = await prisma.club.findMany({ where: { id: { in: clubIds } }, select: { id: true } });
     if (clubs.length !== clubIds.length) return NextResponse.json({ error: "One or more clubs were not found" }, { status: 400 });
 
-    const driver = await prisma.user.create({
+    const driver = await prisma.$transaction(async tx => tx.user.create({
       data: {
         name, email, phone: body.phone ? String(body.phone) : null,
         passwordHash: hashPassword(password),
@@ -60,8 +60,8 @@ export async function POST(req: NextRequest) {
           },
         },
       },
-    });
-    return NextResponse.json(driver, { status: 201 });
+    }));
+    return NextResponse.json(driver, { status: 201, headers: { "Cache-Control": "private, no-store, max-age=0" } });
   } catch {
     return NextResponse.json({ error: "Unable to create driver" }, { status: 400 });
   }
