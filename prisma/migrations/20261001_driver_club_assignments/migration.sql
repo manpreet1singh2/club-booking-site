@@ -14,3 +14,9 @@ FOREIGN KEY ("driverId") REFERENCES "Driver"("id") ON DELETE CASCADE ON UPDATE C
 ALTER TABLE "DriverClub"
 ADD CONSTRAINT "DriverClub_clubId_fkey"
 FOREIGN KEY ("clubId") REFERENCES "Club"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+INSERT INTO "DriverClub" ("driverId", "clubId")
+SELECT DISTINCT tb."driverId", b."clubId"
+FROM "TransportBooking" tb
+INNER JOIN "Booking" b ON b."id" = tb."bookingId"
+WHERE tb."driverId" IS NOT NULL;
