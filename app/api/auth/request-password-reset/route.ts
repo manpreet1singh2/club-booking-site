@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createPasswordResetToken, hashPasswordResetToken } from "@/lib/auth";
 import { z } from "zod";
+import crypto from "crypto";
 
 const requestSchema = z.object({
   email: z.string().trim().toLowerCase().email().max(320),
@@ -15,7 +16,7 @@ function requestKey(email: string, req: Request) {
     ? req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
     : "";
   const client = forwarded || req.headers.get("x-real-ip")?.trim() || "unknown";
-  return require("crypto").createHash("sha256").update("password-reset|" + email + "|" + client).digest("hex");
+  return crypto.createHash("sha256").update("password-reset|" + email + "|" + client).digest("hex");
 }
 
 export async function POST(req: Request) {
@@ -61,12 +62,8 @@ export async function POST(req: Request) {
       },
     });
 
-    console.info("Password reset requested", {
-      userId: user.id,
-      resetUrl: process.env.NEXT_PUBLIC_APP_URL
-        ? process.env.NEXT_PUBLIC_APP_URL + "/reset-password?token=" + token
-        : undefined,
-    });
+    // Deliver the token through the configured email provider here. Never log the raw token.
+    // The endpoint intentionally returns the same generic response regardless of account existence.
 
     return NextResponse.json(generic);
   } catch (error) {
