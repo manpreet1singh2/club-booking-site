@@ -67,10 +67,10 @@ export async function GET(req:NextRequest){
         club:ride.booking.club,
         customer:ride.booking.user,
       },
-    })));
+    }))),{headers:{"Cache-Control":"private, no-store, max-age=0"}});
   }
 
-  return NextResponse.json(transport);
+  return NextResponse.json(transport,{headers:{"Cache-Control":"private, no-store, max-age=0"}});
 }
 
 export async function POST(req:NextRequest){
@@ -135,14 +135,14 @@ export async function POST(req:NextRequest){
         where:{bookingId},
         create:{bookingId,driverId:selectedDriverId,type:booking.transportType,pickupLocation:booking.pickupLocation,pickupTime:booking.pickupTime,status:selectedDriverId?"ASSIGNED":"PENDING"},
         update:{driverId:selectedDriverId,status:selectedDriverId?"ASSIGNED":"PENDING",pickupLocation:booking.pickupLocation,pickupTime:booking.pickupTime},
-        include:{driver:{include:{user:{select:{id:true,name:true,phone:true}}}}}
+        select:{id:true,bookingId:true,driverId:true,type:true,status:true,pickupLocation:true,pickupTime:true,driver:{select:{id:true,vehicleType:true,vehicleNumber:true,available:true,user:{select:{id:true,name:true,phone:true}}}}}
       });
       return {saved};
     },{isolationLevel:"Serializable",maxWait:5000,timeout:10000});
 
     if("error" in transport)return NextResponse.json({error:transport.error},{status:transport.status});
     notifyTransportAssigned(transport.saved.id).catch(()=>undefined);
-    return NextResponse.json(transport.saved,{status:201});
+    return NextResponse.json(transport.saved,{status:201,headers:{"Cache-Control":"private, no-store, max-age=0"}});
   }catch(error){
     if(prismaCode(error)==="P2034")return NextResponse.json({error:"Transport assignment conflicted with another update. Please retry."},{status:409});
     return NextResponse.json({error:error instanceof Error?error.message:"Unable to assign transport"},{status:400});
