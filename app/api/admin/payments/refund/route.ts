@@ -56,7 +56,7 @@ export async function POST(req: Request) {
       const expectedAmountPaise = Math.round(amount * 100);
       if (
         !refund ||
-        refund.id !== String(refund.id) ||
+        !refund.id ||
         refund.payment_id !== payment.gatewayPaymentId ||
         refund.amount !== expectedAmountPaise ||
         refund.status !== "processed"
