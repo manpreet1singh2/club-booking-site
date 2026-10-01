@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, isSameOrigin } from "@/lib/auth";
 import { bookingSchema } from "@/lib/validation";
 import { calculateBookingAmounts, createBookingCode } from "@/lib/booking";
 import { notifyBookingCreated } from "@/lib/notifications";
@@ -76,7 +76,8 @@ async function findIdempotentBooking(key: string, userId: string) {
   return existing;
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(req: NextRequest) { 
+  if (!isSameOrigin(req)) return NextResponse.json({ error: "Invalid request origin" }, { status: 403 });
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
