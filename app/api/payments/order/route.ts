@@ -14,7 +14,18 @@ export async function POST(req: Request) {
     const parsed = paymentOrderSchema.safeParse(await req.json());
     if (!parsed.success) return NextResponse.json({ error: "bookingId is required and must be valid" }, { status: 400 });
     const { bookingId } = parsed.data;
-    const booking = await prisma.booking.findUnique({ where: { id: bookingId } });
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      select: {
+        id: true,
+        bookingCode: true,
+        userId: true,
+        advanceAmount: true,
+        expiresAt: true,
+        status: true,
+        paymentStatus: true,
+      },
+    });
     if (!booking) return NextResponse.json({ error: "Booking not found" }, { status: 404 });
     if (booking.userId !== user.id && user.role !== "SUPER_ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     if (booking.status !== "PENDING_PAYMENT") return NextResponse.json({ error: "Booking is not awaiting payment" }, { status: 400 });
@@ -54,7 +65,7 @@ export async function POST(req: Request) {
       throw error;
     }
   } catch (error) {
-    console.error("Payment order creation failed", error);
+    console.error("Payment order creation failed");
     return NextResponse.json({ error: "Unable to create payment order. Please retry." }, { status: 502 });
   }
 }
