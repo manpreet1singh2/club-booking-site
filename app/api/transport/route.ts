@@ -18,9 +18,35 @@ export async function GET(req:NextRequest){
     where:user.role==="SUPER_ADMIN"?driverId?{driverId}:{}
       :user.role==="CLUB_OWNER"?{...(driverId?{driverId}:{}),booking:{club:{ownerId:user.id}}}
       :user.role==="DRIVER"?{driver:{userId:user.id}}:{booking:{userId:user.id}},
-    include:{
-      booking:{include:{club:{select:{id:true,name:true,city:true,address:true}},user:{select:{id:true,name:true,phone:true}}}},
-      driver:{include:{user:{select:{id:true,name:true,phone:true}}}},
+    select:{
+      id:true,
+      bookingId:true,
+      driverId:true,
+      type:true,
+      status:true,
+      pickupLocation:true,
+      pickupTime:true,
+      booking:{
+        select:{
+          id:true,
+          bookingCode:true,
+          guestCount:true,
+          visitDate:true,
+          status:true,
+          paymentStatus:true,
+          user:{select:{id:true,name:true,phone:true}},
+          club:{select:{id:true,name:true,city:true,address:true}},
+        },
+      },
+      driver:{
+        select:{
+          id:true,
+          vehicleType:true,
+          vehicleNumber:true,
+          available:true,
+          user:{select:{id:true,name:true,phone:true}},
+        },
+      },
     },
     orderBy:{pickupTime:"asc"}
   });
