@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
       const replay = await tx.payment.findUnique({
         where: { orderCreationKey: `manual:${bookingId}:${idempotencyKey}` },
       });
-      if (replay) return { payment: replay };
+      if (replay) {\n        const sameRequest = Number(replay.amount) === amount && replay.gateway === (gateway || "manual") && replay.transactionId === transactionId;\n        if (!sameRequest) return { error: "Idempotency key was already used for a different payment", status: 409 };\n        return { payment: replay };\n      }
 
       const booking = await tx.booking.findUnique({
         where: { id: bookingId },
