@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createPasswordResetToken, hashPasswordResetToken } from "@/lib/auth";
+import { sendPasswordResetEmail } from "@/lib/email";
 import { z } from "zod";
 import crypto from "crypto";
 
@@ -67,12 +68,17 @@ export async function POST(req: Request) {
       },
     });
 
-    // Deliver the token through the configured email provider here. Never log the raw token.
-    // The endpoint intentionally returns the same generic response regardless of account existence.
+    try {
+      await sendPasswordResetEmail({ to: user.email, token });
+    } catch {
+      await prisma.passwordResetToken.deleteMany({
+        where: { userId: user.id, tokenHash: hashPasswordResetToken(token) },
+      }).catch(() => undefined);
+      throw new Error("PASSWORD_RESET_DELIVERY_FAILED");
+    }
 
     return NextResponse.json(generic);
-  } catch (error) {
-    console.error("Password reset request failed", error);
+  } catch {
     return NextResponse.json(generic);
   }
 }
