@@ -46,9 +46,16 @@ export async function POST(req: Request) {
       const existingEvent = await prisma.paymentWebhookEvent.findUnique({ where: { eventId } });
       if (existingEvent?.status === "PROCESSED") return NextResponse.json({ received: true, duplicate: true });
       if (!existingEvent) {
-        await prisma.paymentWebhookEvent.create({ data: { provider: "razorpay", eventId, event, payload } }).catch(error => {
-          if (!(error instanceof Error && error.message.toLowerCase().includes("unique"))) throw error;
-        });
+        try {
+          await prisma.paymentWebhookEvent.create({ data: { provider: "razorpay", eventId, event, payload } });
+        } catch (error) {
+          if (prismaCode(error) !== "P2002") throw error;
+          const racedEvent = await prisma.paymentWebhookEvent.findUnique({ where: { eventId } });
+          if (racedEvent?.status === "PROCESSED" || racedEvent) {
+            return NextResponse.json({ received: true, duplicate: true });
+          }
+          throw error;
+        }
       }
     }
 
