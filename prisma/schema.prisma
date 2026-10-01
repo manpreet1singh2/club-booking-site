@@ -6,7 +6,7 @@ enum PaymentStatus { PENDING PAID FAILED REFUNDED PARTIAL }
 enum TransportType { NONE CAB BIKE }
 enum TransportStatus { PENDING ASSIGNED DRIVER_CONFIRMED ON_THE_WAY ARRIVED PICKED_UP COMPLETED CANCELLED }
 enum PackagePricing { PER_PERSON FLAT }
-enum WebhookEventStatus { RECEIVED PROCESSED FAILED }
+enum WebhookEventStatus { RECEIVED PROCESSING PROCESSED FAILED }
 model User { id String @id @default(cuid()) name String email String @unique phone String? passwordHash String role Role @default(CUSTOMER) bookings Booking[] driver Driver? sessions Session[] ownedClubs Club[] ticketCheckIns TicketCheckIn[] createdAt DateTime @default(now()) updatedAt DateTime @updatedAt }
 model Club { id String @id @default(cuid()) name String ownerId String? owner User? @relation(fields:[ownerId],references:[id]) slug String @unique city String address String description String? imageUrl String? active Boolean @default(true) events Event[] packages Package[] bookings Booking[] createdAt DateTime @default(now()) updatedAt DateTime @updatedAt }
 model Event { id String @id @default(cuid()) clubId String club Club @relation(fields:[clubId],references:[id]) name String slug String date DateTime startTime String endTime String? capacity Int? active Boolean @default(true) bookings Booking[] createdAt DateTime @default(now())
