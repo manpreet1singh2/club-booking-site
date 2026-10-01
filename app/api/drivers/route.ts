@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) return NextResponse.json({ error: "Email already registered" }, { status: 409 });
 
-    const clubs = await prisma.club.findMany({ where: { id: { in: clubIds } }, select: { id: true } });
+    const clubs = await prisma.club.findMany({ where: { id: { in: clubIds }, active: true }, select: { id: true } });
     if (clubs.length !== clubIds.length) return NextResponse.json({ error: "One or more clubs were not found" }, { status: 400 });
 
     const driver = await prisma.$transaction(async tx => tx.user.create({
