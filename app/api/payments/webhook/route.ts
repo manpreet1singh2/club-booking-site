@@ -98,7 +98,8 @@ export async function POST(req: Request) {
       if (eventId) await prisma.paymentWebhookEvent.update({ where: { eventId }, data: { status: "PROCESSED", processedAt: new Date(), error: null } });
       if (confirmed) notifyBookingConfirmed(payment.bookingId).catch(() => undefined);
     } else if (event === "payment.failed") {
-      await prisma.$transaction(async tx => {
+      try {
+        await prisma.$transaction(async tx => {
         const current = await tx.payment.findUnique({ where: { id: payment.id } });
         if (!current || current.status === "PAID" || current.status === "REFUNDED") return;
         if (current.gatewayPaymentId && current.gatewayPaymentId !== String(entity.id)) return;
@@ -106,8 +107,14 @@ export async function POST(req: Request) {
           where: { id: current.id, status: { in: ["PENDING", "FAILED", "PARTIAL"] }, gatewayPaymentId: current.gatewayPaymentId || null },
           data: { status: "FAILED", gatewayPaymentId: String(entity.id), webhookEventId: eventId || null, gateway: "razorpay" },
         });
-        if (claimed.count !== 1) return;
-      });
+          if (claimed.count !== 1) return;
+        });
+      } catch (error) {
+        if (prismaCode(error) === "P2034") {
+          return NextResponse.json({ received: true, retry: true }, { status: 409 });
+        }
+        throw error;
+      }
     }
     if (eventId) {
       await prisma.paymentWebhookEvent.update({
