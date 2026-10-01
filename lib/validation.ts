@@ -42,5 +42,5 @@ export const transportCreateSchema = z.object({
 });
 
 export const driverClubAssignmentSchema = z.object({
-  clubIds: z.array(z.string().min(1).max(100)).max(100).default([]),
+  clubIds: z.array(z.string().min(1).max(100)).max(100).optional(),
 });
