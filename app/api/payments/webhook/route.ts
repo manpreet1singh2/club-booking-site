@@ -32,11 +32,19 @@ export async function POST(req: Request) {
     const event = String(payload.event || "").trim();
     const eventId = String(payload.id || "").trim();
     if (!event || event.length > 100 || !webhookEventIdSchema.safeParse(eventId).success) return NextResponse.json({ error: "Invalid webhook payload" }, { status: 400 });
+    const auditPayload = {
+      eventId,
+      event,
+      paymentId: typeof payload.payload?.payment?.entity?.id === "string" ? payload.payload.payment.entity.id : null,
+      orderId: typeof payload.payload?.payment?.entity?.order_id === "string" ? payload.payload.payment.entity.order_id : null,
+      amount: typeof payload.payload?.payment?.entity?.amount === "number" ? payload.payload.payment.entity.amount : null,
+      currency: typeof payload.payload?.payment?.entity?.currency === "string" ? payload.payload.payment.entity.currency : null,
+    };
     const eventResult = webhookEventSchema.safeParse(event);
     if (!eventResult.success) {
       await prisma.paymentWebhookEvent.upsert({
         where: { provider_eventId: { provider: "razorpay", eventId } },
-        create: { provider: "razorpay", eventId, event, payload, status: "PROCESSED", processedAt: new Date() },
+        create: { provider: "razorpay", eventId, event, payload: auditPayload, status: "PROCESSED", processedAt: new Date() },
         update: { status: "PROCESSED", processingStartedAt: null, processedAt: new Date(), error: null },
       });
       return NextResponse.json({ received: true, ignored: true });
@@ -45,7 +53,7 @@ export async function POST(req: Request) {
     if (!entityResult.success) {
       await prisma.paymentWebhookEvent.upsert({
         where: { provider_eventId: { provider: "razorpay", eventId } },
-        create: { provider: "razorpay", eventId, event, payload, status: "FAILED", error: "Invalid webhook payment entity" },
+        create: { provider: "razorpay", eventId, event, payload: auditPayload, status: "FAILED", error: "Invalid webhook payment entity" },
         update: { status: "FAILED", processingStartedAt: null, error: "Invalid webhook payment entity" },
       });
       return NextResponse.json({ received: true, retry: true }, { status: 409 });
@@ -76,7 +84,7 @@ export async function POST(req: Request) {
       }
       if (!existingEvent) {
         try {
-          await prisma.paymentWebhookEvent.create({ data: { provider: "razorpay", eventId, event, payload, status: "PROCESSING", processingStartedAt: new Date() } });
+          await prisma.paymentWebhookEvent.create({ data: { provider: "razorpay", eventId, event, payload: auditPayload, status: "PROCESSING", processingStartedAt: new Date() } });
         } catch (error) {
           if (prismaCode(error) !== "P2002") throw error;
           const racedEvent = await prisma.paymentWebhookEvent.findUnique({
