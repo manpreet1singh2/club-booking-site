@@ -27,7 +27,9 @@ export async function PATCH(req:Request,{params}:{params:Promise<{id:string}>}){
   const {id}=await params;
   let body:unknown;
   try{body=await req.json()}catch{return NextResponse.json({error:"Invalid JSON"},{status:400})}
-  const parsed=transportStatusSchema.safeParse(body);\n  if(!parsed.success)return NextResponse.json({error:"Invalid transport status"},{status:400});\n  const next=parsed.data.status;
+  const parsed=transportStatusSchema.safeParse(body);
+  if(!parsed.success)return NextResponse.json({error:"Invalid transport status"},{status:400});
+  const next=parsed.data.status;
 
   const ride=await prisma.transportBooking.findUnique({where:{id},include:{driver:true,booking:{include:{club:{select:{ownerId:true}},user:{select:{id:true}}}}}});
   if(!ride)return NextResponse.json({error:"Transport booking not found"},{status:404});
@@ -47,7 +49,9 @@ export async function PATCH(req:Request,{params}:{params:Promise<{id:string}>}){
     if(!["CONFIRMED","COMPLETED"].includes(current.booking.status)||!["PAID","PARTIAL"].includes(current.booking.paymentStatus)){
       throw new Error("Booking is not active for transport");
     }
-    const result=await tx.transportBooking.updateMany({where:{id,status:ride.status as never},data:{status:next as never}});\n    if (result.count !== 1) throw new Error("Transport status changed concurrently. Please refresh and retry.");\n    const updated = await tx.transportBooking.findUniqueOrThrow({where:{id}});
+    const result=await tx.transportBooking.updateMany({where:{id,status:ride.status as never},data:{status:next as never}});
+    if (result.count !== 1) throw new Error("Transport status changed concurrently. Please refresh and retry.");
+    const updated = await tx.transportBooking.findUniqueOrThrow({where:{id}});
     if((next==="COMPLETED"||next==="CANCELLED")&&current.driverId)await tx.driver.update({where:{id:current.driverId},data:{available:true}});
     else if(current.driverId&&next==="DRIVER_CONFIRMED")await tx.driver.update({where:{id:current.driverId},data:{available:false}});
     return updated;
