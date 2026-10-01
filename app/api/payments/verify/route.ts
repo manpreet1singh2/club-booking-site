@@ -21,7 +21,26 @@ export async function POST(req: Request) {
     if (!parsed.success) return NextResponse.json({ error: "Incomplete or invalid payment verification data" }, { status: 400 });
     const { razorpay_order_id: orderId, razorpay_payment_id: paymentId, razorpay_signature: signature } = parsed.data;
 
-    const payment = await prisma.payment.findUnique({ where: { gatewayOrderId: orderId }, include: { booking: true } });
+    const payment = await prisma.payment.findUnique({
+      where: { gatewayOrderId: orderId },
+      select: {
+        id: true,
+        bookingId: true,
+        amount: true,
+        status: true,
+        gatewayPaymentId: true,
+        booking: {
+          select: {
+            id: true,
+            userId: true,
+            totalAmount: true,
+            advanceAmount: true,
+            status: true,
+            expiresAt: true,
+          },
+        },
+      },
+    });
     if (!payment) return NextResponse.json({ error: "Payment order not found" }, { status: 404 });
     if (payment.booking.userId !== user.id && user.role !== "SUPER_ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
@@ -54,7 +73,16 @@ export async function POST(req: Request) {
     });
 
     if (!result.alreadyProcessed && result.updatedBooking.status === "CONFIRMED") notifyBookingConfirmed(result.updatedBooking.id).catch(() => undefined);
-    return NextResponse.json({ ok: true, booking: result.updatedBooking });
+    const response = NextResponse.json({
+      ok: true,
+      booking: {
+        id: result.updatedBooking.id,
+        status: result.updatedBooking.status,
+        paymentStatus: result.updatedBooking.paymentStatus,
+      },
+    });
+    response.headers.set("Cache-Control", "private, no-store, max-age=0");
+    return response;
   } catch (error) {
     if (error instanceof Error && error.message === "PAYMENT_STATE_CONFLICT") return NextResponse.json({ error: "Payment was already processed or changed. Refresh the booking." }, { status: 409 });
     if (error instanceof Error && error.message === "BOOKING_PAYMENT_HOLD_EXPIRED") return NextResponse.json({ error: "Booking payment hold has expired. The payment will require reconciliation before the booking can be confirmed." }, { status: 409 });
