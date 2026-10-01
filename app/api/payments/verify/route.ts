@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, isSameOrigin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { verifyRazorpaySignature, fetchRazorpayPayment } from "@/lib/razorpay";
 import { notifyBookingConfirmed } from "@/lib/notifications";
@@ -12,6 +12,7 @@ const paymentVerificationSchema = z.object({
 });
 
 export async function POST(req: Request) {
+    if (!isSameOrigin(req)) return NextResponse.json({ error: "Invalid request origin" }, { status: 403 });
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
 
