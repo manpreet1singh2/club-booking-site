@@ -15,7 +15,20 @@ export async function GET(req: NextRequest) {
   const privileged = user.role === "SUPER_ADMIN" || user.role === "CLUB_OWNER";
   if (booking.userId !== user.id && !privileged) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const payments = await prisma.payment.findMany({ where: { bookingId }, orderBy: { createdAt: "desc" } });
+  const payments = await prisma.payment.findMany({
+    where: { bookingId },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      amount: true,
+      status: true,
+      gateway: true,
+      transactionId: true,
+      createdAt: true,
+      refundedAmount: true,
+      refundStartedAt: true,
+    },
+  });
   return NextResponse.json(payments);
 }
 
@@ -49,7 +62,10 @@ export async function POST(req: NextRequest) {
       const replay = await tx.payment.findUnique({
         where: { orderCreationKey: `manual:${bookingId}:${idempotencyKey}` },
       });
-      if (replay) {\n        const sameRequest = Number(replay.amount) === amount && replay.gateway === (gateway || "manual") && replay.transactionId === transactionId;\n        if (!sameRequest) return { error: "Idempotency key was already used for a different payment", status: 409 };\n        return { payment: replay };\n      }
+      if (replay) {
+        const sameRequest = Number(replay.amount) === amount && replay.gateway === (gateway || "manual") && replay.transactionId === transactionId;\n        if (!sameRequest) return { error: "Idempotency key was already used for a different payment", status: 409 };
+        return { payment: replay };
+      }
 
       const booking = await tx.booking.findUnique({
         where: { id: bookingId },
