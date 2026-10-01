@@ -11,7 +11,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const id = (await params).id;
   try {
-    const parsed = driverUpdateSchema.safeParse(await req.json());\n    if (!parsed.success) return NextResponse.json({ error: "Invalid driver update" }, { status: 400 });\n    const body = parsed.data;
+    const parsed = driverUpdateSchema.safeParse(await req.json());
+    if (!parsed.success) return NextResponse.json({ error: "Invalid driver update" }, { status: 400 });
+    const body = parsed.data;
     const existing = await prisma.driver.findUnique({
       where: { id },
       include: {
