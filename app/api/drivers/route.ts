@@ -12,7 +12,7 @@ export async function GET() {
     where: user.role === "CLUB_OWNER"
       ? { clubAssignments: { some: { club: { ownerId: user.id } } } }
       : undefined,
-    include: { user: { select: { id: true, name: true, email: true, phone: true, role: true } } },
+    select: { id: true, userId: true, vehicleType: true, vehicleNumber: true, available: true, user: { select: { id: true, name: true, email: true, phone: true, role: true } }, clubAssignments: { select: { clubId: true } } },
     orderBy: { user: { name: "asc" } },
   });
   return NextResponse.json(drivers, { headers: { "Cache-Control": "private, no-store, max-age=0" } });
@@ -34,6 +34,9 @@ export async function POST(req: NextRequest) {
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) return NextResponse.json({ error: "Email already registered" }, { status: 409 });
+
+    const clubs = await prisma.club.findMany({ where: { id: { in: clubIds } }, select: { id: true } });
+    if (clubs.length !== clubIds.length) return NextResponse.json({ error: "One or more clubs were not found" }, { status: 400 });
 
     const driver = await prisma.user.create({
       data: {
