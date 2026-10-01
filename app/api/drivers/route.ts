@@ -12,7 +12,7 @@ export async function GET() {
     where: user.role === "CLUB_OWNER"
       ? { clubAssignments: { some: { club: { ownerId: user.id } } } }
       : undefined,
-    select: { id: true, userId: true, vehicleType: true, vehicleNumber: true, available: true, user: { select: { id: true, name: true, email: true, phone: true, role: true } }, clubAssignments: { select: { clubId: true } } },
+    select: { id: true, userId: true, vehicleType: true, vehicleNumber: true, available: true, user: { select: { id: true, name: true, email: true, phone: true, role: true } }, clubAssignments: { select: { clubId: true, club: { select: { id: true, name: true } } } } },
     orderBy: { user: { name: "asc" } },
   });
   return NextResponse.json(drivers, { headers: { "Cache-Control": "private, no-store, max-age=0" } });
