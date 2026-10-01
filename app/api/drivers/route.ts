@@ -10,7 +10,7 @@ export async function GET() {
 
   const drivers = await prisma.driver.findMany({
     where: user.role === "CLUB_OWNER"
-      ? { assignments: { some: { booking: { club: { ownerId: user.id } } } } }
+      ? { clubAssignments: { some: { club: { ownerId: user.id } } } }
       : undefined,
     include: { user: { select: { id: true, name: true, email: true, phone: true, role: true } } },
     orderBy: { user: { name: "asc" } },
@@ -25,6 +25,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
+    const clubIds = Array.isArray(body.clubIds) ? [...new Set(body.clubIds.map((id: unknown) => String(id).trim()).filter(Boolean))] : [];
     const name = String(body.name || "").trim();
     const email = String(body.email || "").trim().toLowerCase();
     const password = String(body.password || "");
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
         name, email, phone: body.phone ? String(body.phone) : null,
         passwordHash: hashPassword(password),
         role: "DRIVER",
-        driver: { create: { vehicleType, vehicleNumber: body.vehicleNumber ? String(body.vehicleNumber) : null } },
+        driver: { create: { vehicleType, vehicleNumber: body.vehicleNumber ? String(body.vehicleNumber) : null, clubAssignments: clubIds.length ? { create: clubIds.map((clubId: string) => ({ clubId })) } : undefined } },
       },
       select: {
         id: true,
