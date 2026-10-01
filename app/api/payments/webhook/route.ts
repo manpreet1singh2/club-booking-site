@@ -2,6 +2,14 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyWebhookSignature } from "@/lib/razorpay";
 import { notifyBookingConfirmed } from "@/lib/notifications";
+import { z } from "zod";
+
+const webhookEntitySchema = z.object({
+  id: z.string().trim().min(1).max(100),
+  order_id: z.string().trim().min(1).max(100),
+  amount: z.number().int().nonnegative(),
+  currency: z.string().trim().length(3),
+});
 
 function prismaCode(error: unknown) {
   return typeof error === "object" && error !== null && "code" in error
@@ -19,8 +27,9 @@ export async function POST(req: Request) {
     const event = String(payload.event || "").trim();
     const eventId = String(payload.id || "").trim();
     if (!event || event.length > 100 || !eventId || eventId.length > 200) return NextResponse.json({ error: "Invalid webhook payload" }, { status: 400 });
-    const entity = payload.payload?.payment?.entity;
-    if (!entity?.order_id || !entity?.id) return NextResponse.json({ received: true });
+    const entityResult = webhookEntitySchema.safeParse(payload.payload?.payment?.entity);
+    if (!entityResult.success) return NextResponse.json({ received: true });
+    const entity = entityResult.data;
     {
       const existingEvent = await prisma.paymentWebhookEvent.findUnique({ where: { eventId } });
       if (existingEvent?.status === "PROCESSED") return NextResponse.json({ received: true, duplicate: true });
@@ -31,15 +40,15 @@ export async function POST(req: Request) {
       }
     }
 
-    const payment = await prisma.payment.findUnique({ where: { gatewayOrderId: String(entity.order_id) } });
+    const payment = await prisma.payment.findUnique({ where: { gatewayOrderId: entity.order_id } });
     if (!payment) return NextResponse.json({ received: true });
-    const amountPaise = Number(entity.amount || 0);
-    if (!Number.isSafeInteger(amountPaise) || amountPaise !== Math.round(Number(payment.amount) * 100) || String(entity.currency || "") !== "INR") {
+    const amountPaise = entity.amount;
+    if (!Number.isSafeInteger(amountPaise) || amountPaise !== Math.round(Number(payment.amount) * 100) || entity.currency !== "INR") {
       return NextResponse.json({ error: "Webhook payment amount or currency mismatch" }, { status: 400 });
     }
 
     if (event === "payment.captured" || event === "order.paid") {
-      if (payment.status === "PAID" && payment.gatewayPaymentId === String(entity.id)) return NextResponse.json({ received: true, duplicate: true });
+      if (payment.status === "PAID" && payment.gatewayPaymentId === entity.id) return NextResponse.json({ received: true, duplicate: true });
       let confirmed = false;
       try {
         await prisma.$transaction(async tx => {
