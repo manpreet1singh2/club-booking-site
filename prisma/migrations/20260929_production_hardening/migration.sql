@@ -31,7 +31,8 @@ CREATE TABLE "PaymentWebhookEvent" (
   "processedAt" TIMESTAMP(3),
   CONSTRAINT "PaymentWebhookEvent_pkey" PRIMARY KEY ("id")
 );
-CREATE UNIQUE INDEX "PaymentWebhookEvent_eventId_key" ON "PaymentWebhookEvent"("eventId");
+CREATE UNIQUE INDEX "PaymentWebhookEvent_provider_eventId_key" ON "PaymentWebhookEvent"("provider", "eventId");
+CREATE INDEX "PaymentWebhookEvent_eventId_idx" ON "PaymentWebhookEvent"("eventId");
 CREATE INDEX "PaymentWebhookEvent_status_receivedAt_idx" ON "PaymentWebhookEvent"("status", "receivedAt");
 CREATE INDEX "PaymentWebhookEvent_event_receivedAt_idx" ON "PaymentWebhookEvent"("event", "receivedAt");
 
