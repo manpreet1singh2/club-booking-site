@@ -12,7 +12,7 @@ export async function POST(req: Request) {
   try {
     const parsed = resetSchema.safeParse(await req.json());
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid reset token or password" }, { status: 400 });
+      return NextResponse.json({ error: "Invalid reset token or password" }, { status: 400, headers: { "Cache-Control": "no-store" } });
     }
 
     const { token, password } = parsed.data;
@@ -49,10 +49,10 @@ export async function POST(req: Request) {
     });
 
     if (!result) {
-      return NextResponse.json({ error: "Invalid or expired reset token" }, { status: 400 });
+      return NextResponse.json({ error: "Invalid or expired reset token" }, { status: 400, headers: { "Cache-Control": "no-store" } });
     }
 
-    return NextResponse.json({ ok: true, message: "Password reset successfully. Please sign in again." });
+    return NextResponse.json({ ok: true, message: "Password reset successfully. Please sign in again." }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     console.error("Password reset failed", error);
     return NextResponse.json({ error: "Unable to reset password" }, { status: 400 });
