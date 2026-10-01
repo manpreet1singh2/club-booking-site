@@ -15,7 +15,7 @@ export async function GET() {
     include: { user: { select: { id: true, name: true, email: true, phone: true, role: true } } },
     orderBy: { user: { name: "asc" } },
   });
-  return NextResponse.json(drivers);
+  return NextResponse.json(drivers, { headers: { "Cache-Control": "private, no-store, max-age=0" } });
 }
 
 export async function POST(req: NextRequest) {
