@@ -145,7 +145,10 @@ export async function GET(req: NextRequest) {
     },
     orderBy: { createdAt: "desc" },
   });
-  return NextResponse.json(bookings);
+  const responseBookings = user.role === "CUSTOMER"
+    ? bookings
+    : bookings.map(({ ticketToken: _ticketToken, ...booking }) => booking);
+  return NextResponse.json(responseBookings);
 }
 
 function prismaCode(error: unknown) {
