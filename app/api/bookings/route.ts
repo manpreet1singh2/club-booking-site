@@ -148,7 +148,7 @@ export async function GET(req: NextRequest) {
   const responseBookings = user.role === "CUSTOMER"
     ? bookings
     : bookings.map(({ ticketToken: _ticketToken, ...booking }) => booking);
-  return NextResponse.json(responseBookings);
+  return NextResponse.json(responseBookings,{headers:{"Cache-Control":"private, no-store, max-age=0"}});
 }
 
 function prismaCode(error: unknown) {
@@ -164,7 +164,7 @@ function isSerializationConflict(error: unknown) {
 async function findIdempotentBooking(key: string, userId: string) {
   const existing = await prisma.booking.findUnique({
     where: { idempotencyKey: key },
-    include: { club: true, package: true, event: true },
+    select: { id:true, bookingCode:true, userId:true, clubId:true, eventId:true, packageId:true, guestCount:true, transportType:true, visitDate:true, pickupLocation:true, pickupTime:true, totalAmount:true, advanceAmount:true, remainingAmount:true, expiresAt:true, ticketToken:true, status:true, paymentStatus:true, createdAt:true, updatedAt:true, club:{select:{id:true,name:true,slug:true,city:true,address:true,active:true}}, package:{select:{id:true,name:true,description:true,price:true,pricing:true,active:true}}, event:{select:{id:true,name:true,slug:true,date:true,startTime:true,endTime:true,capacity:true,active:true}} },
   });
   if (!existing) return null;
   if (existing.userId !== userId) throw new Error("Idempotency key already belongs to another booking");
