@@ -137,6 +137,13 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     });
   }
 
+  // The ticket token is a bearer credential. Only the booking customer needs it
+  // to render their ticket/QR flow; staff can use the dedicated QR/check-in APIs.
+  if (user.role !== "CUSTOMER") {
+    const { ticketToken: _ticketToken, ...staffBooking } = booking;
+    return NextResponse.json(staffBooking);
+  }
+
   return NextResponse.json(booking);
 }
 
