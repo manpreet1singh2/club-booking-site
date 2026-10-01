@@ -27,6 +27,14 @@ export function hashSessionToken(token: string) {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
 
+export function createPasswordResetToken() {
+  return crypto.randomBytes(32).toString("hex");
+}
+
+export function hashPasswordResetToken(token: string) {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
 export async function createSession(userId: string) {
   const token = createSessionToken();
   const expiresAt = new Date(Date.now() + SESSION_TTL_SECONDS * 1000);
@@ -69,6 +77,10 @@ export async function cleanupExpiredSessions(limit = 500) {
   if (!expired.length) return 0;
   const result = await prisma.session.deleteMany({ where: { id: { in: expired.map(s => s.id) } } });
   return result.count;
+}
+
+export async function revokeAllUserSessions(userId: string) {
+  await prisma.session.deleteMany({ where: { userId } });
 }
 
 export async function requireUser() {
