@@ -95,13 +95,24 @@ export async function POST(req:NextRequest){
 
       let selectedDriverId=requestedDriverId;
       if(!selectedDriverId&&!existing?.driverId){
-        const available=await tx.driver.findFirst({where:{available:true,vehicleType:booking.transportType},orderBy:{id:"asc"}});
+        const available=await tx.driver.findFirst({
+          where:{
+            available:true,
+            vehicleType:booking.transportType,
+            ...(user.role==="CLUB_OWNER" ? { assignments:{some:{booking:{club:{ownerId:user.id}}}} } : {}),
+          },
+          orderBy:{id:"asc"}
+        });
         selectedDriverId=available?.id||null;
       }
 
       if(selectedDriverId){
-        const driver=await tx.driver.findUnique({where:{id:selectedDriverId}});
+        const driver=await tx.driver.findUnique({
+          where:{id:selectedDriverId},
+          select:{id:true,vehicleType:true,available:true,assignments:user.role==="CLUB_OWNER"?{where:{booking:{club:{ownerId:user.id}}},select:{id:true}}:undefined}
+        });
         if(!driver||driver.vehicleType!==booking.transportType)return {error:"Selected driver is invalid for this transport type",status:400};
+        if(user.role==="CLUB_OWNER"&&!driver.assignments?.length)return {error:"Selected driver is not assigned to this club",status:403};
         if(existing?.driverId!==selectedDriverId&&!driver.available)return {error:"Selected driver is unavailable",status:409};
 
         const pickupWindowStart=new Date(booking.pickupTime.getTime()-2*60*60*1000);
