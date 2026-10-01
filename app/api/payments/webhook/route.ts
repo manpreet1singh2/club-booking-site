@@ -137,7 +137,7 @@ export async function POST(req: Request) {
             throw new Error("Payment is already linked to a different gateway payment");
           }
           const booking = await tx.booking.findUnique({ where: { id: current.bookingId } });
-          if (!booking) return;
+          if (!booking) throw new Error("BOOKING_NOT_FOUND");
           if (booking.status !== "PENDING_PAYMENT" || booking.expiresAt <= new Date()) throw new Error("BOOKING_PAYMENT_HOLD_EXPIRED");
           const claimed = await tx.payment.updateMany({ where: { id: current.id, status: { in: ["PENDING", "FAILED", "PARTIAL"] }, gatewayPaymentId: current.gatewayPaymentId || null }, data: { status: "PAID", gatewayPaymentId: String(entity.id), webhookEventId: eventId || null, gateway: "razorpay" } });
           if (claimed.count !== 1) return;
@@ -147,9 +147,13 @@ export async function POST(req: Request) {
           await tx.booking.update({ where: { id: booking.id }, data: { paymentStatus: paid >= Number(booking.totalAmount) ? "PAID" : "PARTIAL", status: confirmed ? "CONFIRMED" : "PENDING_PAYMENT" } });
         });
       } catch (error) {
-        if (eventId && error instanceof Error && error.message.toLowerCase().includes("unique")) return NextResponse.json({ received: true, duplicate: true });
+        if (eventId && error instanceof Error && error.message.toLowerCase().includes("unique")) {
+          await prisma.paymentWebhookEvent.updateMany({ where: { provider: "razorpay", eventId }, data: { status: "FAILED", processingStartedAt: null, error: "Webhook finalization conflict" } });
+          return NextResponse.json({ received: true, retry: true }, { status: 409 });
+        }
         if (prismaCode(error) === "P2034") return NextResponse.json({ received: true, retry: true }, { status: 409 });
         if (error instanceof Error && error.message === "BOOKING_PAYMENT_HOLD_EXPIRED") return NextResponse.json({ received: true, retry: false, reconciliationRequired: true }, { status: 409 });
+        if (error instanceof Error && error.message === "BOOKING_NOT_FOUND") return NextResponse.json({ received: true, retry: false, reconciliationRequired: true }, { status: 409 });
         throw error;
       }
       if (eventId) await prisma.paymentWebhookEvent.update({ where: { eventId }, data: { status: "PROCESSED", processingStartedAt: null, processedAt: new Date(), error: null } });
@@ -176,7 +180,7 @@ export async function POST(req: Request) {
     if (eventId) {
       await prisma.paymentWebhookEvent.update({
         where: { eventId },
-        data: { status: "PROCESSED", processedAt: new Date(), error: null },
+        data: { status: "PROCESSED", processingStartedAt: null, processedAt: new Date(), error: null },
       });
     }
     return NextResponse.json({ received: true });
