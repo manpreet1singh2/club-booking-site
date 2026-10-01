@@ -29,36 +29,65 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const booking = await prisma.booking.findUnique({ where: { id: String(body.bookingId) } });
-    if (!booking) return NextResponse.json({ error: "Booking not found" }, { status: 404 });
-
+    const bookingId = typeof body.bookingId === "string" ? body.bookingId.trim() : "";
+    const gateway = typeof body.gateway === "string" ? body.gateway.trim().slice(0, 50) : "manual";
+    const transactionId = typeof body.transactionId === "string" ? body.transactionId.trim().slice(0, 100) : null;
     const amount = Number(body.amount);
-    if (!Number.isFinite(amount) || amount <= 0) return NextResponse.json({ error: "Invalid payment amount" }, { status: 400 });
 
-    const payment = await prisma.payment.create({
-      data: {
-        bookingId: booking.id,
-        amount,
-        status: "PAID",
-        gateway: String(body.gateway || "manual"),
-        transactionId: body.transactionId ? String(body.transactionId) : null,
-      },
-    });
+    if (!bookingId || bookingId.length > 100) {
+      return NextResponse.json({ error: "Invalid booking ID" }, { status: 400 });
+    }
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return NextResponse.json({ error: "Invalid payment amount" }, { status: 400 });
+    }
 
-    const paidTotal = Number((await prisma.payment.aggregate({
-      where: { bookingId: booking.id, status: "PAID" },
-      _sum: { amount: true },
-    }))._sum.amount || 0);
+    const result = await prisma.$transaction(async tx => {
+      const booking = await tx.booking.findUnique({
+        where: { id: bookingId },
+        include: { payments: { where: { status: "PAID" }, select: { amount: true } } },
+      });
+      if (!booking) return { error: "Booking not found", status: 404 };
 
-    await prisma.booking.update({
-      where: { id: booking.id },
-      data: {
-        paymentStatus: paidTotal >= Number(booking.totalAmount) ? "PAID" : "PARTIAL",
-        status: paidTotal >= Number(booking.advanceAmount) ? "CONFIRMED" : "PENDING_PAYMENT",
-      },
-    });
+      const expectedRemaining = Math.max(
+        0,
+        Number(booking.totalAmount) - booking.payments.reduce((sum, p) => sum + Number(p.amount), 0),
+      );
+      if (amount > expectedRemaining) {
+        return { error: "Payment exceeds the booking's outstanding balance", status: 400 };
+      }
 
-    return NextResponse.json(payment, { status: 201 });
+      const payment = await tx.payment.create({
+        data: {
+          bookingId: booking.id,
+          amount,
+          status: "PAID",
+          gateway: gateway || "manual",
+          transactionId,
+        },
+      });
+
+      const paidTotal = Number(
+        (await tx.payment.aggregate({
+          where: { bookingId: booking.id, status: "PAID" },
+          _sum: { amount: true },
+        }))._sum.amount || 0,
+      );
+
+      await tx.booking.update({
+        where: { id: booking.id },
+        data: {
+          paymentStatus: paidTotal >= Number(booking.totalAmount) ? "PAID" : "PARTIAL",
+          status: paidTotal >= Number(booking.advanceAmount) ? "CONFIRMED" : "PENDING_PAYMENT",
+        },
+      });
+
+      return { payment };
+    }, { isolationLevel: "Serializable", maxWait: 5000, timeout: 10000 });
+
+    if ("error" in result) {
+      return NextResponse.json({ error: result.error }, { status: result.status });
+    }
+    return NextResponse.json(result.payment, { status: 201 });
   } catch {
     return NextResponse.json({ error: "Unable to record payment" }, { status: 400 });
   }
