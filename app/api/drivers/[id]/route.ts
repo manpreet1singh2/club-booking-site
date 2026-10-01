@@ -30,7 +30,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       vehicleNumber: body.vehicleNumber ? String(body.vehicleNumber).trim() : null,
       ...(body.available !== undefined ? { available: Boolean(body.available) } : {}),
     };
-    const updated = await prisma.driver.update({ where: { id }, data });
+    const updated = await prisma.driver.update({ where: { id }, data, select: { id: true, userId: true, vehicleType: true, vehicleNumber: true, available: true } });
 
     await writeAuditLog({
       userId: u.id,
@@ -39,7 +39,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       entityId: id,
       metadata: { vehicleType: updated.vehicleType, available: updated.available },
     });
-    return NextResponse.json(updated);
+    return NextResponse.json(updated, { headers: { "Cache-Control": "private, no-store, max-age=0" } });
   } catch {
     return NextResponse.json({ error: "Unable to update driver" }, { status: 400 });
   }
