@@ -28,6 +28,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Invalid payment status filter" }, { status: 400 });
   }
 
+  if (user.role === "DRIVER") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
   const isPrivileged = user.role === "SUPER_ADMIN" || user.role === "CLUB_OWNER";
   if (requestedUserId && requestedUserId !== user.id && !isPrivileged) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
