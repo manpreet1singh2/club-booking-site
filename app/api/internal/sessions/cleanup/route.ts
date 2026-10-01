@@ -12,9 +12,15 @@ export async function POST(req: Request) {
   const staleLoginAttempts = await prisma.loginAttempt.deleteMany({
     where: { updatedAt: { lt: new Date(Date.now() - 24 * 60 * 60_000) } },
   });
+  const stalePasswordResetAttempts = await prisma.passwordResetAttempt.deleteMany({
+    where: { updatedAt: { lt: new Date(Date.now() - 24 * 60 * 60_000) } },
+  });
+  const expiredPasswordResetTokens = await prisma.passwordResetToken.deleteMany({
+    where: { expiresAt: { lte: new Date() } },
+  });
   const expired = await prisma.booking.updateMany({
     where: { status: "PENDING_PAYMENT", paymentStatus: "PENDING", expiresAt: { lte: new Date() } },
     data: { status: "EXPIRED" },
   });
-  return NextResponse.json({ deleted, staleLoginAttempts: staleLoginAttempts.count, expiredBookings: expired.count });
+  return NextResponse.json({ deleted, staleLoginAttempts: staleLoginAttempts.count, stalePasswordResetAttempts: stalePasswordResetAttempts.count, expiredPasswordResetTokens: expiredPasswordResetTokens.count, expiredBookings: expired.count });
 }
