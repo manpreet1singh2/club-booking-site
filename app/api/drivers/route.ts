@@ -9,6 +9,9 @@ export async function GET() {
   if (user.role !== "SUPER_ADMIN" && user.role !== "CLUB_OWNER") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const drivers = await prisma.driver.findMany({
+    where: user.role === "CLUB_OWNER"
+      ? { assignments: { some: { booking: { club: { ownerId: user.id } } } } }
+      : undefined,
     include: { user: { select: { id: true, name: true, email: true, phone: true, role: true } } },
     orderBy: { user: { name: "asc" } },
   });
