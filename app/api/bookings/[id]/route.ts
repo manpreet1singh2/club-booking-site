@@ -38,6 +38,20 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  if (driverOwnRide) {
+    return NextResponse.json({
+      id: booking.id,
+      bookingCode: booking.bookingCode,
+      status: booking.status,
+      visitDate: booking.visitDate,
+      guestCount: booking.guestCount,
+      club: booking.club,
+      event: booking.event,
+      package: booking.package,
+      transport: booking.transport,
+    });
+  }
+
   return NextResponse.json(booking);
 }
 
