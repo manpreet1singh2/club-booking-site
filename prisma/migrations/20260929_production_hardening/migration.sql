@@ -18,7 +18,7 @@ CREATE INDEX "AuditLog_entity_entityId_createdAt_idx" ON "AuditLog"("entity", "e
 CREATE INDEX "Session_userId_expiresAt_idx" ON "Session"("userId", "expiresAt");
 CREATE INDEX "Session_expiresAt_idx" ON "Session"("expiresAt");
 
-CREATE TYPE "WebhookEventStatus" AS ENUM ('RECEIVED', 'PROCESSED', 'FAILED');
+CREATE TYPE "WebhookEventStatus" AS ENUM ('RECEIVED', 'PROCESSING', 'PROCESSED', 'FAILED');
 CREATE TABLE "PaymentWebhookEvent" (
   "id" TEXT NOT NULL,
   "provider" TEXT NOT NULL,
