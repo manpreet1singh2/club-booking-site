@@ -51,7 +51,7 @@ export async function PATCH(req:Request,{params}:{params:Promise<{id:string}>}){
     }
     const result=await tx.transportBooking.updateMany({where:{id,status:ride.status as never},data:{status:next as never}});
     if (result.count !== 1) throw new Error("Transport status changed concurrently. Please refresh and retry.");
-    const updated = await tx.transportBooking.findUniqueOrThrow({where:{id}});
+    const updated = await tx.transportBooking.findUniqueOrThrow({where:{id},select:{id:true,bookingId:true,driverId:true,type:true,status:true,pickupLocation:true,pickupTime:true}});
     if((next==="COMPLETED"||next==="CANCELLED")&&current.driverId)await tx.driver.update({where:{id:current.driverId},data:{available:true}});
     else if(current.driverId&&next==="DRIVER_CONFIRMED")await tx.driver.update({where:{id:current.driverId},data:{available:false}});
     return updated;
@@ -68,5 +68,5 @@ export async function PATCH(req:Request,{params}:{params:Promise<{id:string}>}){
   if(!updated)return NextResponse.json({error:"Transport booking not found"},{status:404});
   await writeAuditLog({ userId: user.id, action: "TRANSPORT_STATUS_CHANGED", entity: "TransportBooking", entityId: updated.id, metadata: { from: ride.status, to: next, bookingId: ride.bookingId, driverId: ride.driverId } });
   notifyTransportStatus(updated.id).catch(()=>undefined);
-  return NextResponse.json(updated);
+  return NextResponse.json(updated,{headers:{"Cache-Control":"private, no-store, max-age=0"}});
 }
