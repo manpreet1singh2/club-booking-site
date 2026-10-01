@@ -7,6 +7,8 @@ import { z } from "zod";
 const webhookEventSchema = z.enum(["payment.captured", "order.paid", "payment.failed"]);
 const webhookEventIdSchema = z.string().trim().min(1).max(200).regex(/^[A-Za-z0-9._:-]+$/);
 
+const WEBHOOK_PROCESSING_STALE_MS = 5 * 60 * 1000;
+
 const webhookEntitySchema = z.object({
   id: z.string().trim().min(1).max(100),
   order_id: z.string().trim().min(1).max(100),
@@ -47,23 +49,33 @@ export async function POST(req: Request) {
         where: { provider_eventId: { provider: "razorpay", eventId } },
       });
       if (existingEvent?.status === "PROCESSED") return NextResponse.json({ received: true, duplicate: true });
-      if (existingEvent?.status === "PROCESSING") return NextResponse.json({ received: true, retry: true }, { status: 409 });
+      if (existingEvent?.status === "PROCESSING") {
+        const staleBefore = new Date(Date.now() - WEBHOOK_PROCESSING_STALE_MS);
+        if (!existingEvent.processingStartedAt || existingEvent.processingStartedAt > staleBefore) {
+          return NextResponse.json({ received: true, retry: true }, { status: 409 });
+        }
+      }
       if (!existingEvent) {
         try {
-          await prisma.paymentWebhookEvent.create({ data: { provider: "razorpay", eventId, event, payload, status: "PROCESSING" } });
+          await prisma.paymentWebhookEvent.create({ data: { provider: "razorpay", eventId, event, payload, status: "PROCESSING", processingStartedAt: new Date() } });
         } catch (error) {
           if (prismaCode(error) !== "P2002") throw error;
           const racedEvent = await prisma.paymentWebhookEvent.findUnique({
             where: { provider_eventId: { provider: "razorpay", eventId } },
           });
           if (racedEvent?.status === "PROCESSED") return NextResponse.json({ received: true, duplicate: true });
-          if (racedEvent?.status === "PROCESSING") return NextResponse.json({ received: true, retry: true }, { status: 409 });
+          if (racedEvent?.status === "PROCESSING") {
+            const staleBefore = new Date(Date.now() - WEBHOOK_PROCESSING_STALE_MS);
+            if (!racedEvent.processingStartedAt || racedEvent.processingStartedAt > staleBefore) {
+              return NextResponse.json({ received: true, retry: true }, { status: 409 });
+            }
+          }
           throw error;
         }
       } else {
         const claimed = await prisma.paymentWebhookEvent.updateMany({
           where: { provider: "razorpay", eventId, status: { in: ["RECEIVED", "FAILED"] } },
-          data: { status: "PROCESSING", error: null },
+          data: { status: "PROCESSING", processingStartedAt: new Date(), error: null },
         });
         if (claimed.count !== 1) return NextResponse.json({ received: true, retry: true }, { status: 409 });
       }
@@ -102,7 +114,7 @@ export async function POST(req: Request) {
         if (error instanceof Error && error.message === "BOOKING_PAYMENT_HOLD_EXPIRED") return NextResponse.json({ received: true, retry: false, reconciliationRequired: true }, { status: 409 });
         throw error;
       }
-      if (eventId) await prisma.paymentWebhookEvent.update({ where: { eventId }, data: { status: "PROCESSED", processedAt: new Date(), error: null } });
+      if (eventId) await prisma.paymentWebhookEvent.update({ where: { eventId }, data: { status: "PROCESSED", processingStartedAt: null, processedAt: new Date(), error: null } });
       if (confirmed) notifyBookingConfirmed(payment.bookingId).catch(() => undefined);
     } else if (event === "payment.failed") {
       try {
@@ -135,7 +147,7 @@ export async function POST(req: Request) {
     try {
       const payload = JSON.parse(raw);
       const eventId = String(payload.id || "");
-      if (eventId) await prisma.paymentWebhookEvent.updateMany({ where: { eventId }, data: { status: "FAILED", error: message } });
+      if (eventId) await prisma.paymentWebhookEvent.updateMany({ where: { eventId }, data: { status: "FAILED", processingStartedAt: null, error: message } });
     } catch {}
     return NextResponse.json({ error: "Webhook processing failed" }, { status: 400 });
   }
