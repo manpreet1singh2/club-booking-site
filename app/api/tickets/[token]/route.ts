@@ -18,7 +18,6 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
       guestCount: true,
       transportType: true,
       visitDate: true,
-      pickupLocation: true,
       club: { select: { name: true, city: true, address: true } },
       event: { select: { name: true, date: true, startTime: true, endTime: true } },
       package: { select: { name: true } },
