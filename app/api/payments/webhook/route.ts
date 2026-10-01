@@ -31,7 +31,14 @@ export async function POST(req: Request) {
     const eventId = String(payload.id || "").trim();
     if (!event || event.length > 100 || !webhookEventIdSchema.safeParse(eventId).success) return NextResponse.json({ error: "Invalid webhook payload" }, { status: 400 });
     const eventResult = webhookEventSchema.safeParse(event);
-    if (!eventResult.success) return NextResponse.json({ received: true, ignored: true });
+    if (!eventResult.success) {
+      await prisma.paymentWebhookEvent.upsert({
+        where: { eventId },
+        create: { provider: "razorpay", eventId, event, payload, status: "PROCESSED", processedAt: new Date() },
+        update: { status: "PROCESSED", processedAt: new Date(), error: null },
+      });
+      return NextResponse.json({ received: true, ignored: true });
+    }
     const entityResult = webhookEntitySchema.safeParse(payload.payload?.payment?.entity);
     if (!entityResult.success) return NextResponse.json({ received: true });
     const entity = entityResult.data;
