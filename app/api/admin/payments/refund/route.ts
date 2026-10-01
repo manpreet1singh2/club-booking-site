@@ -17,7 +17,11 @@ export async function POST(req: Request) {
     if (!parsed.success) return NextResponse.json({ error: "bookingId is required and must be valid" }, { status: 400 });
     const { bookingId } = parsed.data;
 
-    const booking = await prisma.booking.findUnique({ where: { id: bookingId }, include: { payments: true } });
+    const booking = await prisma.booking.findUnique({ where: { id: bookingId }, select: {
+      id: true,
+      status: true,
+      payments: { select: { id: true, amount: true, status: true, gatewayPaymentId: true, refundId: true } },
+    } });
     if (!booking) return NextResponse.json({ error: "Booking not found" }, { status: 404 });
     if (booking.status !== "REFUND_PENDING" && booking.status !== "REFUNDED") {
       return NextResponse.json({ error: "Booking must be refund-pending or already refunded" }, { status: 400 });
@@ -37,7 +41,7 @@ export async function POST(req: Request) {
         data: { refundStartedAt: new Date() },
       });
       if (claim.count !== 1) {
-        const current = await prisma.payment.findUnique({ where: { id: payment.id } });
+        const current = await prisma.payment.findUnique({ where: { id: payment.id }, select: { refundId: true } });
         if (current?.refundId) continue;
         return NextResponse.json({ error: "Refund is already being processed for this payment" }, { status: 409 });
       }
@@ -46,7 +50,7 @@ export async function POST(req: Request) {
       try {
         refund = await createRazorpayRefund(payment.gatewayPaymentId!, amount, receipt);
       } catch (error) {
-        const existing = await prisma.payment.findUnique({ where: { refundReceipt: receipt } });
+        const existing = await prisma.payment.findUnique({ where: { refundReceipt: receipt }, select: { refundId: true, refundedAmount: true } });
         if (existing?.refundId) {
           refund = { id: existing.refundId, amount: Number(existing.refundedAmount), status: "processed", payment_id: payment.gatewayPaymentId! };
         } else {
