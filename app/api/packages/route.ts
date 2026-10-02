@@ -8,6 +8,7 @@ export async function GET() {
       clubId: true,
       name: true,
       description: true,
+      kind: true,
       price: true,
       pricing: true,
       active: true,

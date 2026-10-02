@@ -6,7 +6,8 @@ import { z } from "zod";
 const registerSchema = z.object({
   name: z.string().trim().min(2).max(100),
   email: z.string().trim().toLowerCase().email().max(320),
-  phone: z.string().trim().max(30).optional(),
+  // WhatsApp number: tickets and pickup alerts are delivered there (requirement 5).
+  phone: z.string().trim().transform(v => v.replace(/[\s()-]/g, "")).pipe(z.string().regex(/^\+?[1-9]\d{9,14}$/)),
   password: z.string().min(8).max(128),
 });
 
@@ -22,7 +23,7 @@ export async function POST(req: Request) {
     const parsed = registerSchema.safeParse(await req.json());
     if (!parsed.success) {
       return NextResponse.json(
-        { error: "Name, valid email and an 8–128 character password are required" },
+        { error: "Name, valid email, WhatsApp mobile number and an 8–128 character password are required" },
         { status: 400 },
       );
     }
@@ -37,7 +38,7 @@ export async function POST(req: Request) {
       data: {
         name,
         email,
-        phone: phone || null,
+        phone,
         passwordHash: hashPassword(password),
         role: "CUSTOMER",
       },

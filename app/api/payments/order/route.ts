@@ -35,37 +35,47 @@ export async function POST(req: Request) {
     }
     if (!["PENDING","PARTIAL"].includes(booking.paymentStatus)) return NextResponse.json({ error: "Booking payment state does not allow an advance order" }, { status: 400 });
 
-    const existing = await prisma.payment.findUnique({ where: { orderCreationKey: "booking:" + booking.id + ":advance" } });
-    if (existing?.status === "PAID" || existing?.status === "REFUNDED") return NextResponse.json({ error: "Advance payment has already been processed" }, { status: 409 });
-    if (existing?.gatewayOrderId && existing.status === "PENDING") return NextResponse.json({ orderId: existing.gatewayOrderId, amount: Number(booking.advanceAmount), currency: "INR", keyId: process.env.PAYMENT_KEY_ID });
-    if (existing && existing.status === "PENDING") return NextResponse.json({ error: "Payment order is already being created. Please retry shortly." }, { status: 409 });
-
     const expectedAdvance = Number(booking.advanceAmount);
-    if (!Number.isFinite(expectedAdvance) || expectedAdvance <= 0) return NextResponse.json({ error: "Invalid payment amount" }, { status: 400 });
-
+    if (!Number.isFinite(expectedAdvance) || expectedAdvance < 1) return NextResponse.json({ error: "Invalid payment amount" }, { status: 400 });
     const orderCreationKey = "booking:" + booking.id + ":advance";
-    let reservation;
-    try {
-      if (!reservation) reservation = await prisma.payment.create({ data: { bookingId: booking.id, amount: booking.advanceAmount, status: "PENDING", gateway: "razorpay", orderCreationKey } });
-    } catch (error) {
-      if (typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "P2002") {
-        const raced = await prisma.payment.findUnique({ where: { orderCreationKey } });
-        if (raced?.gatewayOrderId) return NextResponse.json({ orderId: raced.gatewayOrderId, amount: Number(booking.advanceAmount), currency: "INR", keyId: process.env.PAYMENT_KEY_ID });
-        return NextResponse.json({ error: "Payment order is already being created. Please retry shortly." }, { status: 409 });
+    const respond = (orderId: string) => NextResponse.json({ orderId, amount: expectedAdvance, currency: "INR", keyId: process.env.PAYMENT_KEY_ID, bookingCode: booking.bookingCode }, { headers: { "Cache-Control": "private, no-store, max-age=0" } });
+
+    let reservation = await prisma.payment.findUnique({ where: { orderCreationKey } });
+    if (reservation?.status === "PAID" || reservation?.status === "REFUNDED") return NextResponse.json({ error: "Advance payment has already been processed" }, { status: 409 });
+    // Razorpay lets a customer retry on the same order after a failed attempt, so reuse it.
+    if (reservation?.gatewayOrderId) {
+      if (reservation.status === "FAILED") await prisma.payment.updateMany({ where: { id: reservation.id, status: "FAILED" }, data: { status: "PENDING" } });
+      return respond(reservation.gatewayOrderId);
+    }
+
+    if (!reservation) {
+      try {
+        reservation = await prisma.payment.create({ data: { bookingId: booking.id, amount: booking.advanceAmount, status: "PENDING", gateway: "razorpay", orderCreationKey } });
+      } catch (error) {
+        if (typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "P2002") {
+          return NextResponse.json({ error: "Payment order is already being created. Please retry in a moment." }, { status: 409 });
+        }
+        throw error;
       }
-      throw error;
+    } else {
+      // A previous order-creation call crashed before Razorpay answered. Claim the row (stale after 30s) and retry.
+      const claimed = await prisma.payment.updateMany({
+        where: { id: reservation.id, gatewayOrderId: null, OR: [{ status: "FAILED" }, { createdAt: { lt: new Date(Date.now() - 30_000) } }] },
+        data: { status: "PENDING", createdAt: new Date() },
+      });
+      if (claimed.count !== 1) return NextResponse.json({ error: "Payment order is already being created. Please retry in a moment." }, { status: 409 });
     }
 
     try {
       const order = await createRazorpayOrder(expectedAdvance, booking.bookingCode);
       await prisma.payment.update({ where: { id: reservation.id }, data: { gatewayOrderId: order.id } });
-      return NextResponse.json({ orderId: order.id, amount: expectedAdvance, currency: "INR", keyId: process.env.PAYMENT_KEY_ID });
+      return respond(order.id);
     } catch (error) {
-      await prisma.payment.updateMany({ where: { id: reservation.id, status: "PENDING", gatewayOrderId: null }, data: { status: "FAILED" } });
+      await prisma.payment.updateMany({ where: { id: reservation.id, gatewayOrderId: null }, data: { status: "FAILED" } });
       throw error;
     }
   } catch (error) {
-    console.error("Payment order creation failed");
+    console.error("Payment order creation failed", error);
     return NextResponse.json({ error: "Unable to create payment order. Please retry." }, { status: 502 });
   }
 }

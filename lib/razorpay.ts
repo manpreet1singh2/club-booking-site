@@ -1,9 +1,11 @@
 import crypto from "crypto";
 
-const keyId = process.env.PAYMENT_KEY_ID;
-const keySecret = process.env.PAYMENT_KEY_SECRET;
+// Overridable so integration tests can point at a local mock gateway.
+const API = () => (process.env.RAZORPAY_API_BASE || "https://api.razorpay.com").replace(/\/$/, "");
 
 export function requireRazorpayConfig() {
+  const keyId = process.env.PAYMENT_KEY_ID;
+  const keySecret = process.env.PAYMENT_KEY_SECRET;
   if (!keyId || !keySecret) throw new Error("Payment gateway is not configured");
   return { keyId, keySecret };
 }
@@ -11,7 +13,7 @@ export function requireRazorpayConfig() {
 export async function createRazorpayOrder(amount: number, receipt: string) {
   const { keyId, keySecret } = requireRazorpayConfig();
   const auth = Buffer.from(keyId + ":" + keySecret).toString("base64");
-  const response = await fetch("https://api.razorpay.com/v1/orders", {
+  const response = await fetch(API() + "/v1/orders", {
     method: "POST",
     headers: { Authorization: "Basic " + auth, "Content-Type": "application/json" },
     body: JSON.stringify({ amount: Math.round(amount * 100), currency: "INR", receipt }),
@@ -24,7 +26,7 @@ export async function createRazorpayOrder(amount: number, receipt: string) {
 export async function fetchRazorpayPayment(paymentId: string) {
   const { keyId, keySecret } = requireRazorpayConfig();
   const auth = Buffer.from(keyId + ":" + keySecret).toString("base64");
-  const response = await fetch("https://api.razorpay.com/v1/payments/" + encodeURIComponent(paymentId), {
+  const response = await fetch(API() + "/v1/payments/" + encodeURIComponent(paymentId), {
     headers: { Authorization: "Basic " + auth },
     cache: "no-store",
   });
@@ -41,7 +43,7 @@ export function verifyRazorpaySignature(orderId: string, paymentId: string, sign
 export async function createRazorpayRefund(paymentId: string, amount: number, receipt: string) {
   const { keyId, keySecret } = requireRazorpayConfig();
   const auth = Buffer.from(keyId + ":" + keySecret).toString("base64");
-  const response = await fetch("https://api.razorpay.com/v1/payments/" + encodeURIComponent(paymentId) + "/refund", { method: "POST", headers: { Authorization: "Basic " + auth, "Content-Type": "application/json" }, body: JSON.stringify({ amount: Math.round(amount * 100), receipt }), cache: "no-store" });
+  const response = await fetch(API() + "/v1/payments/" + encodeURIComponent(paymentId) + "/refund", { method: "POST", headers: { Authorization: "Basic " + auth, "Content-Type": "application/json" }, body: JSON.stringify({ amount: Math.round(amount * 100), receipt }), cache: "no-store" });
   if (!response.ok) throw new Error("Unable to create payment refund");
   return response.json() as Promise<{ id: string; amount: number; status: string; payment_id: string }>;
 }
@@ -50,7 +52,7 @@ export async function createRazorpayRefund(paymentId: string, amount: number, re
 export async function fetchRazorpayRefunds(paymentId: string) {
   const { keyId, keySecret } = requireRazorpayConfig();
   const auth = Buffer.from(keyId + ":" + keySecret).toString("base64");
-  const response = await fetch("https://api.razorpay.com/v1/payments/" + encodeURIComponent(paymentId) + "/refunds", {
+  const response = await fetch(API() + "/v1/payments/" + encodeURIComponent(paymentId) + "/refunds", {
     headers: { Authorization: "Basic " + auth },
     cache: "no-store",
   });

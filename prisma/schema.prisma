@@ -1,71 +1,413 @@
-generator client { provider = "prisma-client-js" }
-datasource db { provider = "postgresql" url = env("DATABASE_URL") }
-enum Role { CUSTOMER CLUB_OWNER SUPER_ADMIN DRIVER }
-enum BookingStatus { PENDING_PAYMENT CONFIRMED CANCELLED COMPLETED EXPIRED REFUND_PENDING REFUNDED }
-enum PaymentStatus { PENDING PAID FAILED REFUNDED PARTIAL }
-enum TransportType { NONE CAB BIKE }
-enum TransportStatus { PENDING ASSIGNED DRIVER_CONFIRMED ON_THE_WAY ARRIVED PICKED_UP COMPLETED CANCELLED }
-enum PackagePricing { PER_PERSON FLAT }
-enum WebhookEventStatus { RECEIVED PROCESSING PROCESSED FAILED }
-model User { id String @id @default(cuid()) name String email String @unique phone String? passwordHash String role Role @default(CUSTOMER) bookings Booking[] driver Driver? sessions Session[] ownedClubs Club[] ticketCheckIns TicketCheckIn[] passwordResetTokens PasswordResetToken[] createdAt DateTime @default(now()) updatedAt DateTime @updatedAt }
-model PasswordResetToken { id String @id @default(cuid()) tokenHash String @unique userId String user User @relation(fields:[userId],references:[id],onDelete:Cascade) expiresAt DateTime usedAt DateTime? createdAt DateTime @default(now()) @@index([userId, expiresAt]) @@index([expiresAt]) }
-model Club { id String @id @default(cuid()) name String ownerId String? owner User? @relation(fields:[ownerId],references:[id]) slug String @unique city String address String description String? imageUrl String? active Boolean @default(true) events Event[] packages Package[] bookings Booking[] driverAssignments DriverClub[] createdAt DateTime @default(now()) updatedAt DateTime @updatedAt }
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CUSTOMER
+  CLUB_OWNER
+  SUPER_ADMIN
+  DRIVER
+}
+
+enum BookingStatus {
+  PENDING_PAYMENT
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  EXPIRED
+  REFUND_PENDING
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+  PARTIAL
+}
+
+enum TransportType {
+  NONE
+  CAB
+  BIKE
+}
+
+enum TransportStatus {
+  PENDING
+  ASSIGNED
+  DRIVER_CONFIRMED
+  ON_THE_WAY
+  ARRIVED
+  PICKED_UP
+  COMPLETED
+  CANCELLED
+}
+
+enum PackagePricing {
+  PER_PERSON
+  FLAT
+}
+
+/// Requirement 4.2: Entry only / Entry + Drinks / Entry + Cab / Entry + Bike / Full Combo
+enum PackageKind {
+  ENTRY_ONLY
+  ENTRY_DRINKS
+  ENTRY_CAB
+  ENTRY_BIKE
+  FULL_COMBO
+}
+
+/// Requirement 4.2: Single / Couple / Group / Table booking
+enum BookingType {
+  SINGLE
+  COUPLE
+  GROUP
+  TABLE
+}
+
+enum PromoType {
+  PERCENT
+  FLAT
+}
+
+enum WebhookEventStatus {
+  RECEIVED
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
+model User {
+  id                  String               @id @default(cuid())
+  name                String
+  email               String               @unique
+  phone               String?
+  passwordHash        String
+  role                Role                 @default(CUSTOMER)
+  bookings            Booking[]
+  driver              Driver?
+  sessions            Session[]
+  ownedClubs          Club[]
+  ticketCheckIns      TicketCheckIn[]
+  passwordResetTokens PasswordResetToken[]
+  feedback            Feedback[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, expiresAt])
+  @@index([expiresAt])
+}
+
+model Club {
+  id                String       @id @default(cuid())
+  name              String
+  ownerId           String?
+  owner             User?        @relation(fields: [ownerId], references: [id])
+  slug              String       @unique
+  city              String
+  address           String
+  description       String?
+  imageUrl          String?
+  latitude          Float?
+  longitude         Float?
+  /// Advance is refundable when a customer cancels at least this many hours before the event.
+  cancellationHours Int          @default(24)
+  active            Boolean      @default(true)
+  events            Event[]
+  packages          Package[]
+  bookings          Booking[]
+  driverAssignments DriverClub[]
+  promoCodes        PromoCode[]
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+}
 
 model DriverClub {
-  driverId String
-  clubId String
-  driver Driver @relation(fields:[driverId],references:[id],onDelete:Cascade)
-  club Club @relation(fields:[clubId],references:[id],onDelete:Cascade)
+  driverId  String
+  clubId    String
+  driver    Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  club      Club     @relation(fields: [clubId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
+
   @@id([driverId, clubId])
   @@index([clubId])
 }
-model Event { id String @id @default(cuid()) clubId String club Club @relation(fields:[clubId],references:[id]) name String slug String date DateTime startTime String endTime String? capacity Int? active Boolean @default(true) bookings Booking[] createdAt DateTime @default(now())
+
+model Event {
+  id        String    @id @default(cuid())
+  clubId    String
+  club      Club      @relation(fields: [clubId], references: [id])
+  name      String
+  slug      String
+  date      DateTime
+  startTime String
+  endTime   String?
+  capacity  Int?
+  active    Boolean   @default(true)
+  bookings  Booking[]
+  createdAt DateTime  @default(now())
+
   @@unique([clubId, slug])
   @@index([clubId, date, active])
 }
-model Package { id String @id @default(cuid()) clubId String club Club @relation(fields:[clubId],references:[id]) name String description String? price Decimal @db.Decimal(10,2) pricing PackagePricing @default(PER_PERSON) active Boolean @default(true) bookings Booking[] createdAt DateTime @default(now()) }
-model Booking { id String @id @default(cuid()) bookingCode String @unique
-  idempotencyKey String? @unique userId String user User @relation(fields:[userId],references:[id]) clubId String club Club @relation(fields:[clubId],references:[id]) eventId String? event Event? @relation(fields:[eventId],references:[id]) packageId String package Package @relation(fields:[packageId],references:[id]) guestCount Int transportType TransportType @default(NONE) visitDate DateTime pickupLocation String? pickupTime DateTime? totalAmount Decimal @db.Decimal(10,2) advanceAmount Decimal @db.Decimal(10,2) remainingAmount Decimal @db.Decimal(10,2) expiresAt DateTime ticketToken String @unique @default(cuid()) status BookingStatus @default(PENDING_PAYMENT) paymentStatus PaymentStatus @default(PENDING) payments Payment[] transport TransportBooking? createdAt DateTime @default(now()) updatedAt DateTime @updatedAt }
-model TicketCheckIn { id String @id @default(cuid()) bookingId String @unique booking Booking @relation(fields:[bookingId],references:[id],onDelete:Cascade) checkedInAt DateTime @default(now()) checkedInById String checkedInBy User @relation(fields:[checkedInById],references:[id]) }
-model Payment { id String @id @default(cuid()) bookingId String booking Booking @relation(fields:[bookingId],references:[id]) gatewayOrderId String? @unique
-  orderCreationKey String? @unique gatewayPaymentId String? @unique gatewaySignature String? webhookEventId String? @unique refundId String? @unique refundReceipt String? @unique refundStartedAt DateTime? refundedAmount Decimal @db.Decimal(10,2) @default(0) amount Decimal @db.Decimal(10,2) status PaymentStatus @default(PENDING) gateway String? transactionId String? createdAt DateTime @default(now())
+
+model Package {
+  id          String         @id @default(cuid())
+  clubId      String
+  club        Club           @relation(fields: [clubId], references: [id])
+  name        String
+  description String?
+  kind        PackageKind    @default(ENTRY_ONLY)
+  price       Decimal        @db.Decimal(10, 2)
+  pricing     PackagePricing @default(PER_PERSON)
+  active      Boolean        @default(true)
+  bookings    Booking[]
+  createdAt   DateTime       @default(now())
+}
+
+model Booking {
+  id                 String            @id @default(cuid())
+  bookingCode        String            @unique
+  idempotencyKey     String?           @unique
+  userId             String
+  user               User              @relation(fields: [userId], references: [id])
+  clubId             String
+  club               Club              @relation(fields: [clubId], references: [id])
+  eventId            String?
+  event              Event?            @relation(fields: [eventId], references: [id])
+  packageId          String
+  package            Package           @relation(fields: [packageId], references: [id])
+  bookingType        BookingType       @default(GROUP)
+  guestCount         Int
+  transportType      TransportType     @default(NONE)
+  visitDate          DateTime
+  pickupLocation     String?
+  pickupLat          Float?
+  pickupLng          Float?
+  pickupTime         DateTime?
+  promoCodeId        String?
+  promoCode          PromoCode?        @relation(fields: [promoCodeId], references: [id])
+  subtotalAmount     Decimal           @default(0) @db.Decimal(10, 2)
+  discountAmount     Decimal           @default(0) @db.Decimal(10, 2)
+  totalAmount        Decimal           @db.Decimal(10, 2)
+  advanceAmount      Decimal           @db.Decimal(10, 2)
+  remainingAmount    Decimal           @db.Decimal(10, 2)
+  expiresAt          DateTime
+  ticketToken        String            @unique @default(cuid())
+  status             BookingStatus     @default(PENDING_PAYMENT)
+  paymentStatus      PaymentStatus     @default(PENDING)
+  cancelledAt        DateTime?
+  cancellationReason String?
+  payments           Payment[]
+  transport          TransportBooking?
+  checkIn            TicketCheckIn?
+  feedback           Feedback?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([clubId, visitDate])
+  @@index([eventId, status])
+  @@index([status, paymentStatus])
+  @@index([status, expiresAt])
+}
+
+model TicketCheckIn {
+  id            String   @id @default(cuid())
+  bookingId     String   @unique
+  booking       Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  checkedInAt   DateTime @default(now())
+  checkedInById String
+  checkedInBy   User     @relation(fields: [checkedInById], references: [id])
+}
+
+model Payment {
+  id               String        @id @default(cuid())
+  bookingId        String
+  booking          Booking       @relation(fields: [bookingId], references: [id])
+  gatewayOrderId   String?       @unique
+  orderCreationKey String?       @unique
+  gatewayPaymentId String?       @unique
+  gatewaySignature String?
+  webhookEventId   String?       @unique
+  refundId         String?       @unique
+  refundReceipt    String?       @unique
+  refundStartedAt  DateTime?
+  refundedAmount   Decimal       @default(0) @db.Decimal(10, 2)
+  amount           Decimal       @db.Decimal(10, 2)
+  status           PaymentStatus @default(PENDING)
+  gateway          String?
+  transactionId    String?
+  createdAt        DateTime      @default(now())
+
   @@index([bookingId, status])
+  @@index([status, createdAt])
   @@index([status, refundStartedAt])
 }
-model PaymentWebhookEvent { id String @id @default(cuid()) provider String eventId String event String status WebhookEventStatus @default(RECEIVED) payload Json? error String? receivedAt DateTime @default(now()) processingStartedAt DateTime? processedAt DateTime?
+
+model PaymentWebhookEvent {
+  id                  String             @id @default(cuid())
+  provider            String
+  eventId             String
+  event               String
+  status              WebhookEventStatus @default(RECEIVED)
+  payload             Json?
+  error               String?
+  receivedAt          DateTime           @default(now())
+  processingStartedAt DateTime?
+  processedAt         DateTime?
+
   @@unique([provider, eventId])
   @@index([eventId])
   @@index([status, receivedAt])
   @@index([event, receivedAt])
 }
-model Driver { id String @id @default(cuid()) userId String @unique user User @relation(fields:[userId],references:[id]) vehicleType TransportType vehicleNumber String? available Boolean @default(true) assignments TransportBooking[] clubAssignments DriverClub[] }
-model TransportBooking { id String @id @default(cuid()) bookingId String @unique booking Booking @relation(fields:[bookingId],references:[id]) driverId String? driver Driver? @relation(fields:[driverId],references:[id]) type TransportType status TransportStatus @default(PENDING) pickupLocation String pickupTime DateTime }
-model PromoCode { id String @id @default(cuid()) code String @unique type String value Decimal @db.Decimal(10,2) active Boolean @default(true) expiresAt DateTime? }
-model NotificationLog {
-  id String @id @default(cuid())
-  idempotencyKey String @unique
-  userId String?
-  channel String
-  template String recipient String parameters Json?
-  status String
-  providerMessageId String?
-  attempt Int @default(1)
-  maxAttempts Int @default(3)
-  nextAttemptAt DateTime?
-  lockedAt DateTime?
-  lastError String?
-  sentAt DateTime?
+
+model Driver {
+  id              String             @id @default(cuid())
+  userId          String             @unique
+  user            User               @relation(fields: [userId], references: [id])
+  vehicleType     TransportType
+  vehicleNumber   String?
+  /// On-duty flag. Ride overlap is checked per pickup window, so one driver can hold rides on different nights.
+  available       Boolean            @default(true)
+  assignments     TransportBooking[]
+  clubAssignments DriverClub[]
+}
+
+model TransportBooking {
+  id             String          @id @default(cuid())
+  bookingId      String          @unique
+  booking        Booking         @relation(fields: [bookingId], references: [id])
+  driverId       String?
+  driver         Driver?         @relation(fields: [driverId], references: [id])
+  type           TransportType
+  status         TransportStatus @default(PENDING)
+  pickupLocation String
+  pickupLat      Float?
+  pickupLng      Float?
+  pickupTime     DateTime
+  assignedAt     DateTime?
+  reminderSentAt DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([driverId, status])
+  @@index([status, pickupTime])
+}
+
+model PromoCode {
+  id        String    @id @default(cuid())
+  code      String    @unique
+  type      PromoType
+  value     Decimal   @db.Decimal(10, 2)
+  clubId    String?
+  club      Club?     @relation(fields: [clubId], references: [id])
+  minAmount Decimal   @default(0) @db.Decimal(10, 2)
+  maxUses   Int?
+  usedCount Int       @default(0)
+  active    Boolean   @default(true)
+  expiresAt DateTime?
+  bookings  Booking[]
+  createdAt DateTime  @default(now())
+}
+
+model Feedback {
+  id        String   @id @default(cuid())
+  bookingId String   @unique
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  rating    Int
+  comment   String?
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model NotificationLog {
+  id                String    @id @default(cuid())
+  idempotencyKey    String    @unique
+  userId            String?
+  channel           String
+  template          String
+  recipient         String
+  parameters        Json?
+  status            String
+  providerMessageId String?
+  attempt           Int       @default(1)
+  maxAttempts       Int       @default(3)
+  nextAttemptAt     DateTime?
+  lockedAt          DateTime?
+  lastError         String?
+  sentAt            DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
   @@index([status, nextAttemptAt])
   @@index([lockedAt])
   @@index([userId, createdAt])
 }
-model AuditLog { id String @id @default(cuid()) userId String? action String entity String entityId String? metadata Json? createdAt DateTime @default(now()) }
-model Session { id String @id @default(cuid()) tokenHash String @unique userId String user User @relation(fields:[userId],references:[id],onDelete:Cascade) expiresAt DateTime createdAt DateTime @default(now())
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  entity    String
+  entityId  String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([entity, entityId, createdAt])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
   @@index([userId, expiresAt])
   @@index([expiresAt])
 }
-model LoginAttempt { id String @id @default(cuid()) keyHash String @unique attempts Int @default(0) windowStartedAt DateTime @default(now()) blockedUntil DateTime? updatedAt DateTime @updatedAt @@index([blockedUntil]) }
-model PasswordResetAttempt { id String @id @default(cuid()) keyHash String @unique attempts Int @default(0) windowStartedAt DateTime @default(now()) updatedAt DateTime @updatedAt @@index([windowStartedAt]) }
+
+model LoginAttempt {
+  id              String    @id @default(cuid())
+  keyHash         String    @unique
+  attempts        Int       @default(0)
+  windowStartedAt DateTime  @default(now())
+  blockedUntil    DateTime?
+  updatedAt       DateTime  @updatedAt
+
+  @@index([blockedUntil])
+}
+
+model PasswordResetAttempt {
+  id              String   @id @default(cuid())
+  keyHash         String   @unique
+  attempts        Int      @default(0)
+  windowStartedAt DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([windowStartedAt])
+}

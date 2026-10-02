@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { clubToday, reservedGuestsByEvent, spotsLeft } from "@/lib/availability";
+
+export const dynamic = "force-dynamic";
 
 export default async function EventDetail({ params }: { params: Promise<{ clubSlug: string; eventSlug: string }> }) {
   const { clubSlug, eventSlug } = await params;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = clubToday();
   const event = await prisma.event.findFirst({
     where: { slug: eventSlug, club: { slug: clubSlug }, active: true, date: { gte: today } },
     select: {
@@ -17,12 +19,11 @@ export default async function EventDetail({ params }: { params: Promise<{ clubSl
       endTime: true,
       capacity: true,
       club: { select: { id: true, name: true, city: true } },
-      bookings: { where: { status: { in: ["PENDING_PAYMENT", "CONFIRMED"] } }, select: { guestCount: true } },
     },
   });
   if (!event) return notFound();
-  const reserved = event.bookings.reduce((n, b) => n + b.guestCount, 0);
-  const remaining = event.capacity ? Math.max(0, event.capacity - reserved) : null;
+  const reserved = (await reservedGuestsByEvent([event.id])).get(event.id) ?? 0;
+  const remaining = spotsLeft(event.capacity, reserved);
 
   return <main className="pt-32 pb-20"><div className="container max-w-4xl">
     <span className="eyebrow">{event.club.name} · {event.club.city}</span>
