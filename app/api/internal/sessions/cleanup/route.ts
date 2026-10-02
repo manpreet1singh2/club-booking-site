@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
+import { isAuthorizedJob } from "@/lib/jobs";
 import { cleanupExpiredSessions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 const BATCH_SIZE = 500;
 
 export async function POST(req: Request) {
-  const secret = process.env.INTERNAL_JOB_SECRET;
-  if (!secret || req.headers.get("x-internal-job-secret") !== secret) {
+  if (!isAuthorizedJob(req)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -67,3 +67,7 @@ export async function POST(req: Request) {
     expiredBookings: expired.count,
   });
 }
+
+// Vercel Cron issues GET requests.
+export const GET = POST;
+export const dynamic = "force-dynamic";

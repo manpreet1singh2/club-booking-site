@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { istTodayStart } from "@/lib/dates";
+
+export const dynamic = "force-dynamic";
 
 export default async function EventDetail({ params }: { params: Promise<{ clubSlug: string; eventSlug: string }> }) {
   const { clubSlug, eventSlug } = await params;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = istTodayStart();
   const event = await prisma.event.findFirst({
     where: { slug: eventSlug, club: { slug: clubSlug }, active: true, date: { gte: today } },
     include: { club: true, bookings: { where: { status: { in: ["PENDING_PAYMENT", "CONFIRMED"] } }, select: { guestCount: true } } },

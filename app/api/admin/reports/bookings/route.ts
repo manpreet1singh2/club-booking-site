@@ -18,7 +18,8 @@ export async function GET(req: Request) {
   const to = searchParams.get("to");
   const clubId = searchParams.get("clubId");
   const paymentStatus = searchParams.get("paymentStatus");
-  const transportType = searchParams.get("transportType");\n  const rawLimit = searchParams.get("limit") ?? "1000";
+  const transportType = searchParams.get("transportType");
+  const rawLimit = searchParams.get("limit") ?? "1000";
   const parsedLimit = Number(rawLimit);
   if (!Number.isInteger(parsedLimit) || parsedLimit < 1 || parsedLimit > 5000) {
     return NextResponse.json({ error: "Invalid limit" }, { status: 400 });
@@ -60,7 +61,8 @@ export async function GET(req: Request) {
   const bookings = await prisma.booking.findMany({
     where,
     orderBy: { createdAt: "desc" },
-    include: { user: true, club: true, event: true, package: true },\n    take: limit,
+    include: { user: true, club: true, event: true, package: true },
+    take: limit,
   });
 
   const header = ["Booking ID","Name","Phone","Email","Date","Time","Club","Package","Guests","Transport Type","Pickup Location","Payment Status","Booking Status","Total Amount","Advance Amount","Remaining Amount"];

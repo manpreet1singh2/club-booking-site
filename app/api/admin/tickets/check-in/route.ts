@@ -2,10 +2,7 @@ import {NextResponse} from "next/server";
 import {getCurrentUser} from "@/lib/auth";
 import {prisma} from "@/lib/prisma";
 import {writeAuditLog} from "@/lib/audit";
-
-function sameLocalDate(a:Date,b:Date){
-  return a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate();
-}
+import {dayKey,istToday} from "@/lib/dates";
 
 export async function POST(req:Request){
   const user=await getCurrentUser();
@@ -18,7 +15,7 @@ export async function POST(req:Request){
       if(!booking)return {error:"Ticket not found",status:404};
       if(user.role==="CLUB_OWNER"&&booking.club.ownerId!==user.id)return {error:"Forbidden",status:403};
       if(booking.status!=="CONFIRMED"||!["PAID","PARTIAL"].includes(booking.paymentStatus))return {error:"Ticket is not valid for entry",status:400};
-      if(!sameLocalDate(new Date(booking.visitDate),new Date()))return {error:"This ticket can only be checked in on the booking date",status:400};
+      if(dayKey(booking.visitDate)!==istToday())return {error:"This ticket can only be checked in on the booking date",status:400};
       if(booking.checkIn)return {error:"Ticket has already been checked in",status:409,checkedInAt:booking.checkIn.checkedInAt};
       const checkIn=await tx.ticketCheckIn.create({data:{bookingId:booking.id,checkedInById:user.id}});
       return {ok:true,bookingCode:booking.bookingCode,guestCount:booking.guestCount,club:booking.club.name,event:booking.event?.name||booking.package.name,checkedInAt:checkIn.checkedInAt};

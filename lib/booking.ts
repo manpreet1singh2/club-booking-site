@@ -1,3 +1,17 @@
+import crypto from "crypto";
+
 export const ADVANCE_RATE = 0.15;
-export function calculateBookingAmounts(price:number, guestCount=1, pricing:"PER_PERSON"|"FLAT"="PER_PERSON"){const unit=Math.max(0,Number(price)||0);const guests=Math.max(1,Math.floor(guestCount));const totalAmount=pricing==="PER_PERSON"?unit*guests:unit;const advanceAmount=Math.round(totalAmount*ADVANCE_RATE*100)/100;return {totalAmount,advanceAmount,remainingAmount:Math.round((totalAmount-advanceAmount)*100)/100};}
-export function createBookingCode(){const date=new Date().toISOString().slice(0,10).replaceAll("-","");return `LIC-${date}-${Math.random().toString(36).slice(2,7).toUpperCase()}`;}
+
+export function calculateBookingAmounts(price: number, guestCount = 1, pricing: "PER_PERSON" | "FLAT" = "PER_PERSON") {
+  const unit = Math.max(0, Number(price) || 0);
+  const guests = Math.max(1, Math.floor(guestCount));
+  const totalAmount = pricing === "PER_PERSON" ? unit * guests : unit;
+  const advanceAmount = Math.round(totalAmount * ADVANCE_RATE * 100) / 100;
+  return { totalAmount, advanceAmount, remainingAmount: Math.round((totalAmount - advanceAmount) * 100) / 100 };
+}
+
+export function createBookingCode() {
+  const date = new Date().toISOString().slice(0, 10).replaceAll("-", "");
+  const suffix = crypto.randomBytes(4).toString("hex").slice(0, 6).toUpperCase();
+  return `LIC-${date}-${suffix}`;
+}

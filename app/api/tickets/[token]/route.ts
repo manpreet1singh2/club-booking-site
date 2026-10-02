@@ -36,5 +36,5 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
         event: booking.event,
         package: booking.package,
       };
-  return NextResponse.json({ valid, ticket });
+  return NextResponse.json({ valid, ticket, viewerRole: viewer?.role ?? null });
 }

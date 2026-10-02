@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
+import { isAuthorizedJob } from "@/lib/jobs";
 import { prisma } from "@/lib/prisma";
 import { retryNotification } from "@/lib/notifications";
 
 const LOCK_TTL_MS = 5 * 60 * 1000;
 
 export async function POST(req: Request) {
-  const secret = process.env.INTERNAL_JOB_SECRET;
-  if (!secret || req.headers.get("x-internal-job-secret") !== secret) {
+  if (!isAuthorizedJob(req)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -56,3 +56,7 @@ export async function POST(req: Request) {
 
   return NextResponse.json({ selected: jobs.length, claimed, processed: results.length, results });
 }
+
+// Vercel Cron issues GET requests.
+export const GET = POST;
+export const dynamic = "force-dynamic";

@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "regions": ["bom1"],
+  "crons": [
+    { "path": "/api/internal/notifications/retry", "schedule": "*/5 * * * *" },
+    { "path": "/api/internal/sessions/cleanup", "schedule": "0 3 * * *" }
+  ]
+}

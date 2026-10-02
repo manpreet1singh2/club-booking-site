@@ -5,19 +5,7 @@ import { prisma } from "@/lib/prisma";
 export const SESSION_COOKIE = "lic_session";
 export const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
 
-export function hashPassword(password: string) {
-  const salt = crypto.randomBytes(16).toString("hex");
-  const hash = crypto.scryptSync(password, salt, 64).toString("hex");
-  return salt + ":" + hash;
-}
-
-export function verifyPassword(password: string, stored: string) {
-  const [salt, key] = stored.split(":");
-  if (!salt || !key || !/^[0-9a-f]+$/i.test(key)) return false;
-  const hash = crypto.scryptSync(password, salt, 64);
-  const expected = Buffer.from(key, "hex");
-  return expected.length === hash.length && crypto.timingSafeEqual(hash, expected);
-}
+export { hashPassword, verifyPassword } from "@/lib/password";
 
 export function createSessionToken() {
   return crypto.randomBytes(32).toString("hex");

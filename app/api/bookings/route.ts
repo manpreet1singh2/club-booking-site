@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
-import { bookingSchema } from "@/lib/validation";
+import { bookingInputSchema } from "@/lib/validation";
 import { calculateBookingAmounts, createBookingCode } from "@/lib/booking";
 import { notifyBookingCreated } from "@/lib/notifications";
+import { dayKey, istToday } from "@/lib/dates";
 
 const PAYMENT_HOLD_MINUTES = 15;
 
@@ -80,7 +81,7 @@ export async function POST(req: NextRequest) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
-    const body = bookingSchema.omit({ userId: true }).parse(await req.json());
+    const body = bookingInputSchema.parse(await req.json());
     const idempotencyKey = req.headers.get("x-idempotency-key")?.trim();
     if (idempotencyKey && (idempotencyKey.length < 16 || idempotencyKey.length > 200)) return NextResponse.json({ error: "Invalid idempotency key" }, { status: 400 });
     if (idempotencyKey) {
@@ -100,10 +101,10 @@ export async function POST(req: NextRequest) {
           if (!pkg || !pkg.active) throw new Error("Package unavailable");
           const club = await tx.club.findUnique({ where: { id: body.clubId } });
           if (!club || !club.active || pkg.clubId !== club.id) throw new Error("Club unavailable");
-          if (body.visitDate.getTime() < Date.now() - 60_000) throw new Error("Visit date must be in the future");
+          if (dayKey(body.visitDate) < istToday()) throw new Error("Visit date cannot be in the past");
 
           const event = await tx.event.findFirst({ where: { id: body.eventId, clubId: club.id, active: true } });
-          if (!event || event.date.toDateString() !== body.visitDate.toDateString()) {
+          if (!event || dayKey(event.date) !== dayKey(body.visitDate)) {
             throw new Error("Selected event is not available on this date");
           }
 

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const bookingSchema = z.object({
+const bookingBase = z.object({
   userId: z.string().min(1),
   clubId: z.string().min(1),
   eventId: z.string().min(1),
@@ -10,11 +10,19 @@ export const bookingSchema = z.object({
   transportType: z.enum(["NONE", "CAB", "BIKE"]).default("NONE"),
   pickupLocation: z.string().trim().max(500).optional(),
   pickupTime: z.coerce.date().optional(),
-}).superRefine((v, ctx) => {
+});
+
+type BookingShape = z.infer<typeof bookingBase>;
+
+function refineBooking(v: Omit<BookingShape, "userId"> & { userId?: string }, ctx: z.RefinementCtx) {
   if (v.transportType !== "NONE" && !v.pickupLocation) ctx.addIssue({ code: "custom", path: ["pickupLocation"], message: "Pickup location is required for transport" });
   if (v.transportType !== "NONE" && !v.pickupTime) ctx.addIssue({ code: "custom", path: ["pickupTime"], message: "Pickup time is required for transport" });
   if (v.pickupTime && v.pickupTime.getTime() < Date.now() - 60000) ctx.addIssue({ code: "custom", path: ["pickupTime"], message: "Pickup time must be in the future" });
-});
+}
+
+export const bookingSchema = bookingBase.superRefine(refineBooking);
+/** API input: the user id always comes from the session, never the request body. */
+export const bookingInputSchema = bookingBase.omit({ userId: true }).superRefine(refineBooking);
 
 export const bookingStatusSchema = z.object({
   status: z.enum(["CONFIRMED", "CANCELLED", "COMPLETED", "EXPIRED", "REFUND_PENDING", "REFUNDED"]),
