@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { hashPassword } from "@/lib/auth";
+import { isSameOrigin, hashPassword } from "@/lib/auth";
 import { z } from "zod";
 
 const registerSchema = z.object({
@@ -17,6 +17,7 @@ function prismaCode(error: unknown) {
 }
 
 export async function POST(req: Request) {
+  if (!isSameOrigin(req)) return NextResponse.json({ error: "Invalid request origin" }, { status: 403 });
   try {
     const parsed = registerSchema.safeParse(await req.json());
     if (!parsed.success) {

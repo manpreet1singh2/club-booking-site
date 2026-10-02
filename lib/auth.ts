@@ -93,20 +93,24 @@ export async function requireUser() {
   return user;
 }
 
+function allowedOrigins(req: Request) {
+  const origins = new Set<string>();
+  try { origins.add(new URL(req.url).origin); } catch {}
+  // Behind a TLS-terminating proxy req.url can be http://internal-host, so also trust the configured public URL.
+  const configured = process.env.NEXT_PUBLIC_APP_URL;
+  if (configured) { try { origins.add(new URL(configured).origin); } catch {} }
+  return origins;
+}
+
 export function isSameOrigin(req: Request) {
+  const allowed = allowedOrigins(req);
   const origin = req.headers.get("origin");
-  if (origin) {
-    try {
-      return origin === new URL(req.url).origin;
-    } catch {
-      return false;
-    }
-  }
+  if (origin) return allowed.has(origin);
 
   const referer = req.headers.get("referer");
   if (!referer) return false;
   try {
-    return new URL(referer).origin === new URL(req.url).origin;
+    return allowed.has(new URL(referer).origin);
   } catch {
     return false;
   }

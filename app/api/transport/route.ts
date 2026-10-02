@@ -67,7 +67,7 @@ export async function GET(req:NextRequest){
         club:ride.booking.club,
         customer:ride.booking.user,
       },
-    }))),{headers:{"Cache-Control":"private, no-store, max-age=0"}});
+    })),{headers:{"Cache-Control":"private, no-store, max-age=0"}});
   }
 
   return NextResponse.json(transport,{headers:{"Cache-Control":"private, no-store, max-age=0"}});

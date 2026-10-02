@@ -1,1 +1,44 @@
-{"name":"live-in-the-city","version":"1.0.0","private":true,"scripts":{"dev":"next dev","build":"next build","start":"next start","lint":"next lint","prisma:generate":"prisma generate","prisma:migrate":"prisma migrate deploy","prisma:push":"prisma db push","prisma:seed":"tsx prisma/seed.ts","db:setup":"prisma generate && prisma migrate deploy && prisma db seed","typecheck":"tsc --noEmit"},"dependencies":{"@prisma/client":"latest","lucide-react":"latest","next":"latest","react":"latest","react-dom":"latest","zod":"latest","qrcode":"latest","xlsx":"latest"},"devDependencies":{"@types/node":"latest","@types/react":"latest","@types/react-dom":"latest","eslint":"latest","eslint-config-next":"latest","prisma":"latest","typescript":"latest","@types/qrcode":"latest","tsx":"latest"}}
+{
+  "name": "live-in-the-city",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate deploy",
+    "prisma:push": "prisma db push",
+    "prisma:seed": "tsx prisma/seed.ts",
+    "db:setup": "prisma generate && prisma migrate deploy && prisma db seed",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.3",
+    "lucide-react": "1.49.0",
+    "next": "16.3.8",
+    "qrcode": "1.5.4",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "xlsx": "0.18.5",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.4",
+    "@types/qrcode": "1.5.6",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.3.8",
+    "prisma": "6.19.3",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3"
+  },
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  }
+}

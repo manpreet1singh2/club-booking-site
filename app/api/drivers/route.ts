@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const clubIds = Array.isArray(body.clubIds) ? [...new Set(body.clubIds.map((id: unknown) => String(id).trim()).filter(Boolean))] : [];
+    const clubIds: string[] = Array.isArray(body.clubIds) ? [...new Set<string>(body.clubIds.map((id: unknown) => String(id).trim()).filter(Boolean))] : [];
     const name = String(body.name || "").trim();
     const email = String(body.email || "").trim().toLowerCase();
     const password = String(body.password || "");

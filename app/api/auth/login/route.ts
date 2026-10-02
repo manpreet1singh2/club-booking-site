@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createSession, SESSION_COOKIE, SESSION_TTL_SECONDS, verifyPassword } from "@/lib/auth";
+import { isSameOrigin, createSession, SESSION_COOKIE, SESSION_TTL_SECONDS, verifyPassword } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import crypto from "crypto";
 
@@ -13,6 +13,7 @@ function throttleKey(email: string, req: Request) {
 }
 
 export async function POST(req: Request) {
+  if (!isSameOrigin(req)) return NextResponse.json({ error: "Invalid request origin" }, { status: 403 });
   try {
     const body = await req.json();
     const email = String(body.email || "").trim().toLowerCase();
@@ -37,7 +38,7 @@ export async function POST(req: Request) {
     }
 
     await prisma.loginAttempt.deleteMany({ where: { keyHash } });
-    const token = await createSession(user.id);
+    const { token } = await createSession(user.id);
 
     const response = NextResponse.json({ user: { id: user.id, name: user.name, email: user.email, role: user.role } }, { headers: { "Cache-Control": "no-store" } });
     response.cookies.set(SESSION_COOKIE, token, {

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { createPasswordResetToken, hashPasswordResetToken } from "@/lib/auth";
+import { isSameOrigin, createPasswordResetToken, hashPasswordResetToken } from "@/lib/auth";
 import { sendPasswordResetEmail } from "@/lib/email";
 import { z } from "zod";
 import crypto from "crypto";
@@ -21,6 +21,7 @@ function requestKey(email: string, req: Request) {
 }
 
 export async function POST(req: Request) {
+  if (!isSameOrigin(req)) return NextResponse.json({ error: "Invalid request origin" }, { status: 403 });
   const generic = {
     ok: true,
     message: "If an account exists for that email, recovery instructions have been requested.",

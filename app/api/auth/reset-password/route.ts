@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { hashPassword, hashPasswordResetToken } from "@/lib/auth";
+import { isSameOrigin, hashPassword, hashPasswordResetToken } from "@/lib/auth";
 import { z } from "zod";
 
 const resetSchema = z.object({
@@ -9,6 +9,7 @@ const resetSchema = z.object({
 });
 
 export async function POST(req: Request) {
+  if (!isSameOrigin(req)) return NextResponse.json({ error: "Invalid request origin" }, { status: 403 });
   try {
     const parsed = resetSchema.safeParse(await req.json());
     if (!parsed.success) {
